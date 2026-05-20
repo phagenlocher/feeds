@@ -1,0 +1,120 @@
+"""Async orchestration: runs feed operations in background threads."""
+
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from feeds.models.feed import Feed, FeedReader
+from feeds.services.worker import WorkerThread
+
+
+@dataclass
+class _PendingOp:
+    fn: Callable[[], object]
+    on_done: Callable[[], object] | None
+    on_error: Callable[[str], object] | None
+
+
+class FeedService:
+    """Manages background worker lifecycle for feed operations.
+
+    Operations are queued when one is already in progress and executed
+    sequentially in FIFO order.
+    """
+
+    def __init__(self, reader: FeedReader) -> None:
+        self._reader: FeedReader = reader
+        self._worker: WorkerThread | None = None
+        self._queue: list[_PendingOp] = []
+
+    @property
+    def is_busy(self) -> bool:
+        return self._worker is not None
+
+    def run(
+        self,
+        fn: Callable[[], object],
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> bool:
+        """Execute *fn* in a background thread.
+
+        If an operation is already in progress, *fn* is queued and will
+        run when the current operation finishes.
+        Always returns True.
+        """
+        if self._worker is not None:
+            self._queue.append(_PendingOp(fn, on_done, on_error))
+            return True
+
+        self._start(fn, on_done, on_error)
+        return True
+
+    def _start(
+        self,
+        fn: Callable[[], object],
+        on_done: Callable[[], object] | None,
+        on_error: Callable[[str], object] | None,
+    ) -> None:
+        thread = WorkerThread(fn)
+
+        def _done() -> None:
+            if on_done:
+                on_done()
+
+        def _error(msg: str) -> None:
+            if on_error:
+                on_error(msg)
+
+        def _cleanup() -> None:
+            self._worker = None
+            self._process_queue()
+
+        thread.done.connect(_done)
+        thread.error.connect(_error)
+        thread.finished.connect(_cleanup)
+        self._worker = thread
+        thread.start()
+
+    def _process_queue(self) -> None:
+        if self._queue and self._worker is None:
+            op = self._queue.pop(0)
+            self._start(op.fn, op.on_done, op.on_error)
+
+    def add_feed(
+        self,
+        url: str,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        self.run(lambda: self._reader.add_feed(url), on_done, on_error)
+
+    def update_feed(
+        self,
+        url: str,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        self.run(lambda: self._reader.update_feed(url), on_done, on_error)
+
+    def update_feeds(
+        self,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        self.run(lambda: self._reader.update_feeds(), on_done, on_error)
+
+    def delete_feed(
+        self,
+        feed: Feed,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        self.run(lambda: self._reader.delete_feed(feed), on_done, on_error)
+
+    def mark_all_as_read(
+        self,
+        feed: Feed,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        self.run(lambda: self._reader.mark_all_as_read(feed), on_done, on_error)

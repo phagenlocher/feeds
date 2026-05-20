@@ -1,0 +1,85 @@
+[project]
+name = "feeds"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "reader>=3.24,<3.25",
+    "PySide6"
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright",
+    "ruff",
+    "nuitka>=4.1.1",
+]
+
+[tool.ruff.lint]
+extend-select = [
+    # flake8-type-checking
+    "TC",
+    # flake8-tidy-imports
+    "TID",
+    # pep8-naming
+    "N",
+    # flake8-builtins
+    "A",
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # pydocstyle
+    "D",
+    # Perflint
+    "PERF",
+    # tryceratops
+    "TRY",
+    # flake8-annotations
+    "ANN",
+    # flake8-async
+    "ASYNC",
+    # flake8-comprehensions
+    "C4",
+    # flake8-print
+    "T20",
+    # flake8-pyi
+    "PYI",
+    # flake8-return
+    "RET",
+    # Ruff-specific rules
+    "RUF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"feeds/*" = ["D", "N802"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.basedpyright]
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportMissingTypeStubs = false
+reportExplicitAny = false
+reportAny = false
+reportUnknownParameterType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+extraPaths = ["."]
+
+[[tool.basedpyright.executionEnvironments]]
+root = "feeds"
+reportUnusedCallResult = "none"
+reportImplicitOverride = "none"
+reportUnreachable = "none"
+reportUnnecessaryComparison = "none"
