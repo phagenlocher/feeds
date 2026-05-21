@@ -1,4 +1,18 @@
-"""Data-layer: Feed/Entry dataclasses and FeedReader wrapping the reader library."""
+"""Data-layer: Feed/Entry dataclasses and FeedReader wrapping the reader library.
+
+The :class:`FeedReader` class is the primary API surface for feed
+management.  It wraps the ``reader`` library and adds feed-discovery
+logic that can handle raw HTML pages, platform-specific URL patterns
+(YouTube, Reddit, Medium, Substack), and common feed path heuristics.
+
+Feed discovery pipeline (in order):
+
+1. Platform-specific pre-handlers (before HTTP fetch)
+2. Direct feed parsing via ``feedparser.parse()``
+3. HTML ``<link rel="alternate">`` tag scanning
+4. HTTP ``Link`` response headers (RFC 5988)
+5. Common-path probing (``/feed/``, ``/rss``, etc.)
+"""
 
 import logging
 import os
@@ -27,14 +41,35 @@ _DB_PATH: Path = Path(
 
 
 class _FeedLinkFinder(HTMLParser):
-    """HTML parser that extracts feed <link> tags."""
+    """HTML parser that extracts feed ``<link>`` tags from a page.
+
+    Collects ``<link rel="alternate">`` elements whose ``type``
+    attribute matches a known feed MIME type
+    (:data:`FEED_MIME_TYPES`).  Also tracks ``<base href>`` for
+    correct relative URL resolution.
+    """
 
     def __init__(self) -> None:
+        """Initialise the parser with empty results and no base URL."""
         super().__init__()
         self.feeds: list[tuple[str, str]] = []
         self.base_href: str | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        """Process an HTML start tag.
+
+        Handles two tag types:
+
+        * ``<base>`` — records the ``href`` attribute as the base URL
+          for resolving relative feed URLs.
+        * ``<link>`` — checks for ``rel="alternate"`` (space-separated
+          multi-value support) and a recognised feed MIME type, then
+          appends ``(href, title)`` to :attr:`feeds`.
+
+        Args:
+            tag: The HTML tag name (lowercased by ``HTMLParser``).
+            attrs: List of ``(name, value)`` tuples from the parser.
+        """
         attrs_dict = {k.lower(): v for k, v in attrs if v is not None}
 
         if tag == "base":
@@ -61,6 +96,11 @@ FEED_MIME_TYPES = frozenset(
         "application/feed+json",
     }
 )
+"""Recognised feed MIME types for autodiscovery.
+
+Used when scanning ``<link>`` tags and ``Link`` HTTP headers to
+identify feed references.  Includes RSS, Atom, and JSON Feed.
+"""
 
 _FEED_PATHS: tuple[str, ...] = (
     "/feed/",
@@ -76,6 +116,21 @@ _FEED_PATHS: tuple[str, ...] = (
     "/blog?format=rss",
     "/feeds/posts/default",
 )
+"""Well-known feed URL paths probed as a fallback discovery method.
+
+Each path is appended to the domain root (and the current path's
+parent directory) and tested with ``feedparser``.
+
+Platforms targeted:
+
+* ``/feed/``, ``/feed`` — WordPress
+* ``/feed.xml``, ``/index.xml`` — static-site generators (Hugo, Jekyll)
+* ``/feed.json`` — JSON Feed
+* ``/atom.xml``, ``/atom`` — Atom feeds
+* ``/rss``, ``/rss/``, ``/rss.xml`` — Tumblr, Ghost, generic RSS
+* ``/blog?format=rss`` — Squarespace
+* ``/feeds/posts/default`` — Blogger
+"""
 
 
 def _parse_link_header(header_value: str, base_url: str) -> list[tuple[str, str]]:
@@ -88,6 +143,13 @@ def _parse_link_header(header_value: str, base_url: str) -> list[tuple[str, str]
 
     Only entries with ``rel="alternate"`` and a recognised feed
     MIME type are returned.
+
+    Args:
+        header_value: The raw ``Link`` header value.
+        base_url: The base URL for resolving relative ``href`` values.
+
+    Returns:
+        List of ``(feed_url, title)`` tuples found in the header.
     """
     feeds: list[tuple[str, str]] = []
     try:
@@ -110,15 +172,20 @@ def _try_common_paths(url: str) -> list[tuple[str, str]]:
     """Probe well-known feed paths on the domain.
 
     Tried when no feed was found via ``<link>`` tags or ``Link``
-    headers.  Probes paths such as ``/feed/`` (WordPress),
-    ``/feed.xml`` / ``/index.xml`` (static-site generators),
-    ``/atom.xml``, ``/rss`` (Tumblr), and ``/feeds/posts/default``
-    (Blogger) relative to the domain root, plus relative to the
-    current path if it differs from root.
+    headers.  Probes paths from :data:`_FEED_PATHS` relative to the
+    domain root, plus relative to the current path's parent directory
+    if it differs from root.
 
-    Each candidate is fetched (3 s timeout) and run through
-    ``feedparser``.  Only candidates that parse as valid feeds are
-    returned.
+    Each candidate is fetched with a 3-second timeout and validated
+    through ``feedparser``.  Only candidates that parse as valid
+    feeds are returned.
+
+    Args:
+        url: The original page URL (used to extract scheme, host, and
+            parent path).
+
+    Returns:
+        List of ``(feed_url, title)`` tuples for discovered feeds.
     """
     parsed = urlparse(url)
     base = f"{parsed.scheme}://{parsed.netloc}"
@@ -167,6 +234,15 @@ def _try_common_paths(url: str) -> list[tuple[str, str]]:
 
 @dataclass(frozen=True, slots=True)
 class Feed:
+    """A single RSS/Atom feed tracked in the local database.
+
+    Attributes:
+        id: The feed's URL (used as the unique identifier).
+        title: Human-readable display title.
+        last_updated: Timestamp of the most recent update, or ``None``
+            if never updated.
+    """
+
     id: str
     title: str
     last_updated: datetime | None
@@ -174,6 +250,17 @@ class Feed:
 
 @dataclass(frozen=True, slots=True)
 class Entry:
+    """A single entry (article/post) within a feed.
+
+    Attributes:
+        url: Permalink to the entry.
+        title: Entry headline.
+        last_updated: Publication or last-updated timestamp.
+        entry_id: Unique identifier within the feed (``reader`` internals).
+        feed_id: The :attr:`Feed.id` this entry belongs to.
+        read: Whether the entry has been marked as read.
+    """
+
     url: str
     title: str
     last_updated: datetime | None
@@ -183,12 +270,36 @@ class Entry:
 
 
 class FeedReader:
+    """High-level interface for feed management and discovery.
+
+    Wraps the ``reader`` library and provides feed discovery,
+    subscription management, and entry navigation.  All database
+    state is persisted to the SQLite database at :data:`_DB_PATH`.
+
+    Typical usage::
+
+        reader = FeedReader()
+        reader.add_feed("https://example.com/feed.xml")
+        reader.update_feeds()
+        for feed in reader.get_feeds():
+            for entry in reader.get_posts(feed):
+                print(entry.title)
+    """
+
     def __init__(self) -> None:
+        """Initialise the reader, creating the database directory if needed."""
         _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         self.reader: reader.Reader = reader.make_reader(str(_DB_PATH))
         self._last_discovered_feeds: list[tuple[str, str]] = []
 
     def add_feed(self, url: str) -> None:
+        """Subscribe to a feed URL.
+
+        If the feed is already subscribed, this is a no-op.
+
+        Args:
+            url: The feed URL to add.
+        """
         self.reader.add_feed(url, exist_ok=True)
 
     @staticmethod
@@ -197,39 +308,34 @@ class FeedReader:
 
         Uses the following methods, in order:
 
-        1. **Direct feed check**
-           Tries to parse the response as a feed (RSS, Atom, JSON Feed)
-           using ``feedparser``.  If the URL is itself a feed, it is
-           returned immediately.
+        1. **Platform pre-handlers** — specialised handlers for
+           Substack, Medium, Reddit, and YouTube that run **before**
+           any HTTP request.  They construct the feed URL directly
+           from known platform URL patterns, bypassing slow page
+           fetches and consent walls.
 
-        2. **HTML ``<link>`` tags**
-           Scans the HTML for ``<link rel="alternate">`` with a feed
-           MIME type (``application/rss+xml``, ``application/atom+xml``,
-           ``application/feed+json``).
+        2. **Direct feed check** — tries to parse the response as a
+           feed (RSS, Atom, JSON Feed) using ``feedparser``.  If the
+           URL is itself a feed, it is returned immediately.
 
-        3. **HTTP ``Link`` headers**
-           Parses ``Link`` response headers (RFC 5988) referencing
-           alternate feeds.
+        3. **HTML ``<link>`` tags** — scans the HTML for
+           ``<link rel="alternate">`` with a feed MIME type
+           (``application/rss+xml``, ``application/atom+xml``,
+           ``application/feed+json``).  Supports multi-value ``rel``
+           attributes and ``<base href>`` for relative URL resolution.
 
-        4. **Common path probing**
-           Probes well-known feed paths (``/feed/``, ``/feed.xml``,
-           ``/index.xml``, etc.) as a last resort.
+        4. **HTTP ``Link`` headers** — parses ``Link`` response
+           headers (RFC 5988) referencing alternate feeds.
+
+        5. **Common path probing** — probes well-known feed paths
+           (``/feed/``, ``/feed.xml``, ``/index.xml``, etc.) as a
+           last resort when all other methods fail.
+
+        Args:
+            url: The URL to discover feeds from.
 
         Returns:
             ``[(feed_url, title), ...]``, or ``[]`` if nothing was found.
-
-         .. note::
-
-            Several platforms get specialised pre-handlers that run
-            **before** any HTTP request to the URL itself:
-
-            * :func:`feeds.discovery.substack.try_substack`
-            * :func:`feeds.discovery.medium.try_medium`
-            * :func:`feeds.discovery.reddit.try_reddit`
-            * :func:`feeds.discovery.youtube.try_youtube`
-
-            YouTube in particular serves a GDPR consent wall instead
-            of the actual page, so fetching it directly never works.
         """
         # Platform-specific pre-handlers (before HTTP request).
         feeds = try_substack(url)
@@ -308,27 +414,64 @@ class FeedReader:
     def discover_feeds(self, url: str) -> list[tuple[str, str]]:
         """Discover feed URLs from *url*.
 
-        Returns ``[(feed_url, title), ...]``.
-        Results are also available via :attr:`last_discovered_feeds`.
+        Wraps :meth:`_discover_feed_urls` and caches the result in
+        :attr:`last_discovered_feeds`.
+
+        Args:
+            url: The URL to discover feeds from.
+
+        Returns:
+            ``[(feed_url, title), ...]``.
         """
         self._last_discovered_feeds = self._discover_feed_urls(url)
         return self._last_discovered_feeds
 
     @property
     def last_discovered_feeds(self) -> list[tuple[str, str]]:
+        """The most recently discovered feed URLs and titles.
+
+        Populated by :meth:`discover_feeds`.  Returns an empty list
+        if no discovery has been performed yet.
+        """
         return self._last_discovered_feeds
 
     def update_feeds(self) -> None:
+        """Fetch new entries for all subscribed feeds.
+
+        Iterates over every feed in the database and fetches the
+        latest content from its URL.
+        """
         self.reader.update_feeds()
 
     def update_feed(self, feed_url: str) -> None:
+        """Fetch new entries for a single feed.
+
+        Args:
+            feed_url: The URL of the feed to update.
+        """
         self.reader.update_feed(feed_url)
 
     def get_feeds(self) -> Iterator[Feed]:
+        """Yield all subscribed feeds.
+
+        Yields:
+            :class:`Feed` instances in an unspecified order.
+        """
         for f in self.reader.get_feeds():
             yield Feed(id=f.url, title=f.title or "No Title", last_updated=f.updated)
 
     def get_posts(self, feed: Feed) -> Iterator[Entry]:
+        """Yield all entries (posts) belonging to a feed.
+
+        Entries without a ``link`` attribute are skipped with a
+        warning log.
+
+        Args:
+            feed: The feed whose entries to retrieve.
+
+        Yields:
+            :class:`Entry` instances in insertion order.
+        """
         for e in self.reader.get_entries(feed=feed.id):
             if not e.link:
                 log.warning("entry %s has no link, skipping", e.id)
@@ -343,17 +486,45 @@ class FeedReader:
             )
 
     def mark_entry_as_read(self, entry: Entry) -> None:
+        """Mark a single entry as read.
+
+        Args:
+            entry: The entry to mark.
+        """
         self.reader.mark_entry_as_read((entry.feed_id, entry.entry_id))
 
     def mark_entry_as_unread(self, entry: Entry) -> None:
+        """Mark a single entry as unread.
+
+        Args:
+            entry: The entry to mark.
+        """
         self.reader.mark_entry_as_unread((entry.feed_id, entry.entry_id))
 
     def delete_feed(self, feed: Feed) -> None:
+        """Unsubscribe a feed and remove all its entries.
+
+        Args:
+            feed: The feed to delete.
+        """
         self.reader.delete_feed(feed.id)
 
     def mark_all_as_read(self, feed: Feed) -> None:
+        """Mark every entry in a feed as read.
+
+        Args:
+            feed: The feed whose entries should be marked read.
+        """
         for e in self.reader.get_entries(feed=feed.id):
             self.reader.mark_entry_as_read((feed.id, e.id))
 
     def get_unread_count(self, feed: Feed) -> int:
+        """Return the number of unread entries in a feed.
+
+        Args:
+            feed: The feed to count unread entries for.
+
+        Returns:
+            The unread entry count (0 if all are read).
+        """
         return (self.reader.get_entry_counts(feed=feed.id, read=False).total) or 0

@@ -4,6 +4,10 @@ Supported URL patterns:
 
 * ``https://NEWSLETTER.substack.com`` — newsletter home
 * ``https://NEWSLETTER.substack.com/p/ARTICLE`` — article page
+
+All Substack newsletters expose their full RSS feed at ``/feed`` on the
+subdomain.  This handler extracts the subdomain and constructs the feed
+URL directly, avoiding a full page fetch.
 """
 
 import logging
@@ -19,16 +23,30 @@ _FEED_TIMEOUT = 10
 
 
 def try_substack(url: str) -> list[tuple[str, str]]:
-    """Attempt to discover a Substack feed from *url*.
+    """Discover a Substack feed from *url*.
 
-    Returns ``[(feed_url, title)]`` or ``[]``.
+    Extracts the subdomain from a ``*.substack.com`` hostname and
+    constructs the feed URL as ``https://{subdomain}.substack.com/feed``.
+
+    For example:
+
+    * ``https://example.substack.com`` → ``https://example.substack.com/feed``
+    * ``https://example.substack.com/p/some-article`` → ``https://example.substack.com/feed``
+
+    The candidate is validated with ``feedparser`` before being returned.
+
+    Args:
+        url: A Substack URL (e.g. ``https://example.substack.com``).
+
+    Returns:
+        ``[(feed_url, title)]`` if a valid feed was found, ``[]`` otherwise.
     """
     parsed = urlparse(url)
     hostname = parsed.hostname or ""
     if not hostname.endswith(".substack.com"):
         return []
 
-    # Extract subdomain — strip ".substack.com"
+    # Extract the newsletter name by stripping the ".substack.com" suffix.
     subdomain = hostname.removesuffix(".substack.com")
     if not subdomain:
         return []
@@ -38,7 +56,15 @@ def try_substack(url: str) -> list[tuple[str, str]]:
 
 
 def _validate_feed(feed_url: str) -> list[tuple[str, str]]:
-    """Fetch and validate *feed_url* with ``feedparser``."""
+    """Fetch *feed_url* and confirm it is a valid RSS/Atom feed.
+
+    Args:
+        feed_url: The candidate feed URL to validate.
+
+    Returns:
+        ``[(feed_url, title)]`` if the URL returns parseable feed
+        content, ``[]`` otherwise.
+    """
     try:
         resp: requests.Response = requests.get(
             feed_url,
