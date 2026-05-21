@@ -1,5 +1,6 @@
 """Left (FeedsPane) and right (EntriesPane) panes with context menus."""
 
+import typing
 import webbrowser
 from dataclasses import replace
 from enum import IntEnum, auto
@@ -98,21 +99,24 @@ class FeedsPane(QtWidgets.QWidget):
         if action is None:
             return
         kind = FeedMenuAction(action.data())
-        if kind is FeedMenuAction.COPY_URL:
-            QtWidgets.QApplication.clipboard().setText(self.feeds[index].id)
-        elif kind is FeedMenuAction.READ_ALL:
-            self.read_all_requested.emit(index)
-        elif kind is FeedMenuAction.REMOVE:
-            confirm = QtWidgets.QMessageBox.question(
-                self,
-                "Remove feed",
-                f"Remove '{self.feeds[index].title}'?",
-                QtWidgets.QMessageBox.StandardButton.Yes
-                | QtWidgets.QMessageBox.StandardButton.No,
-                QtWidgets.QMessageBox.StandardButton.No,
-            )
-            if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
-                self.remove_feed_requested.emit(index)
+        match kind:
+            case FeedMenuAction.COPY_URL:
+                QtWidgets.QApplication.clipboard().setText(self.feeds[index].id)
+            case FeedMenuAction.READ_ALL:
+                self.read_all_requested.emit(index)
+            case FeedMenuAction.REMOVE:
+                confirm = QtWidgets.QMessageBox.question(
+                    self,
+                    "Remove feed",
+                    f"Remove '{self.feeds[index].title}'?",
+                    QtWidgets.QMessageBox.StandardButton.Yes
+                    | QtWidgets.QMessageBox.StandardButton.No,
+                    QtWidgets.QMessageBox.StandardButton.No,
+                )
+                if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
+                    self.remove_feed_requested.emit(index)
+            case _ as unreachable:
+                typing.assert_never(unreachable)
 
 
 class EntriesPane(QtWidgets.QWidget):
@@ -194,7 +198,10 @@ class EntriesPane(QtWidgets.QWidget):
         if action is None:
             return
         kind = EntryMenuAction(action.data())
-        if kind is EntryMenuAction.MARK_READ:
-            self.entry_read_requested.emit(index)
-        elif kind is EntryMenuAction.MARK_UNREAD:
-            self.entry_unread_requested.emit(index)
+        match kind:
+            case EntryMenuAction.MARK_READ:
+                self.entry_read_requested.emit(index)
+            case EntryMenuAction.MARK_UNREAD:
+                self.entry_unread_requested.emit(index)
+            case _ as unreachable:
+                typing.assert_never(unreachable)

@@ -19,7 +19,7 @@ class FeedListWidget(QtWidgets.QListWidget):
     def set_font_size(self, size: int) -> None:
         self._font_size = size
         for i in range(self.count()):
-            item = self.item(i)
+            item: QtWidgets.QListWidgetItem | None = self.item(i)
             if item is None:
                 continue
             bold = item.font().bold()
@@ -53,7 +53,9 @@ class FeedListWidget(QtWidgets.QListWidget):
             and isinstance(event, QtGui.QMouseEvent)
             and obj is self.viewport()
         ):
-            item = self.itemAt(event.position().toPoint())
+            item: QtWidgets.QListWidgetItem | None = self.itemAt(
+                event.position().toPoint()
+            )
             cursor = (
                 QtCore.Qt.CursorShape.PointingHandCursor
                 if item

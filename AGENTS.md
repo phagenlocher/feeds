@@ -15,3 +15,6 @@
 - @dataclass(frozen=True, slots=True) for data models
 - CamelCase for Qt subclasses, snake_case for everything else
 - Private methods prefixed `_`
+- Use `match`/`case` with `typing.assert_never` for dispatching on enums and sumtypes
+- Annotate variable assignments from function calls when the return type is not trivially inferable from the call itself (e.g., `log: Logger = logging.getLogger(...)`, `m: re.Match | None = re.match(...)`)
+  Constructor calls (`Foo()`) and well-known stdlib functions (`len()`, `bool()`) need no annotation.

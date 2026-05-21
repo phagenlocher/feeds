@@ -12,7 +12,7 @@ from feeds.ui.delegates import TwoLineRenderer
 from feeds.ui.dialogs import AddFeedChoiceDialog, AddFeedDialog
 from feeds.ui.panes import EntriesPane, FeedsPane
 
-log = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 
 class FeedsApp(QtWidgets.QMainWindow):
@@ -218,13 +218,9 @@ class FeedsApp(QtWidgets.QMainWindow):
 
         self.statusBar().showMessage("Adding feed…")
         self._set_busy(True)
-        _service.add_feed(
-            feed_url, on_done=on_added, on_error=self._on_service_error
-        )
+        _service.add_feed(feed_url, on_done=on_added, on_error=self._on_service_error)
 
-    def _add_feeds_sequentially(
-        self, feeds: list[tuple[str, str]], index: int
-    ) -> None:
+    def _add_feeds_sequentially(self, feeds: list[tuple[str, str]], index: int) -> None:
         if index >= len(feeds):
             if self.reader is None:
                 return
@@ -254,9 +250,7 @@ class FeedsApp(QtWidgets.QMainWindow):
 
         self.statusBar().showMessage(f"Adding feed {index + 1}/{total}…")
         self._set_busy(True)
-        _service.add_feed(
-            feed_url, on_done=on_added, on_error=self._on_service_error
-        )
+        _service.add_feed(feed_url, on_done=on_added, on_error=self._on_service_error)
 
     def _on_add_feed_done(
         self, url: str, on_next: Callable[[], object] | None = None

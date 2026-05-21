@@ -77,7 +77,7 @@ class FeedService:
 
     def _process_queue(self) -> None:
         if self._queue and self._worker is None:
-            op = self._queue.pop(0)
+            op: _PendingOp = self._queue.pop(0)
             self._start(op.fn, op.on_done, op.on_error)
 
     def add_feed(

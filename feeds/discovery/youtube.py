@@ -23,7 +23,7 @@ from urllib.parse import parse_qs, urlparse
 import feedparser
 import requests
 
-log = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 _USER_AGENT = "feeds/0.1"
 _OEMBED_TIMEOUT = 5
@@ -46,7 +46,7 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     path = parsed.path.rstrip("/")
 
     # /channel/UC_ID
-    m = re.match(r"/channel/(UC[\w-]{22,})", path)
+    m: re.Match[str] | None = re.match(r"/channel/(UC[\w-]{22,})", path)
     if m:
         return _validate_feed(
             f"https://www.youtube.com/feeds/videos.xml?channel_id={m.group(1)}"
@@ -68,7 +68,7 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
 
     # /watch?v=VIDEO_ID
     if path == "/watch":
-        video_id = parse_qs(parsed.query).get("v", [None])[0]
+        video_id: str | None = parse_qs(parsed.query).get("v", [None])[0]
         if video_id:
             return _feed_from_video_id(video_id)
 
@@ -98,13 +98,13 @@ def _validate_feed(feed_url: str) -> list[tuple[str, str]]:
     ``[]`` otherwise.
     """
     try:
-        resp = requests.get(
+        resp: requests.Response = requests.get(
             feed_url,
             timeout=_FEED_TIMEOUT,
             headers={"User-Agent": _USER_AGENT},
         )
         resp.raise_for_status()
-        parsed = feedparser.parse(resp.content)
+        parsed: feedparser.FeedParserDict = feedparser.parse(resp.content)
         if parsed.version:
             feed = parsed.feed
             title = feed.get("title", "") if isinstance(feed, dict) else ""
@@ -127,15 +127,15 @@ def _feed_from_video_id(video_id: str) -> list[tuple[str, str]]:
             f"?url=https://www.youtube.com/watch?v={video_id}"
             "&format=json"
         )
-        resp = requests.get(
+        resp: requests.Response = requests.get(
             url,
             timeout=_OEMBED_TIMEOUT,
             headers={"User-Agent": _USER_AGENT},
         )
         resp.raise_for_status()
         data = resp.json()
-        author_url = data.get("author_url", "")
-        m = re.search(r"/(@?[\w.-]+)$", author_url)
+        author_url: str = data.get("author_url", "")
+        m: re.Match[str] | None = re.search(r"/(@?[\w.-]+)$", author_url)
         if m:
             handle = m.group(1).lstrip("@")
             return _validate_feed(

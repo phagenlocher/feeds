@@ -16,7 +16,7 @@ from requests.utils import parse_header_links
 
 from feeds.discovery.youtube import try_youtube
 
-log = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 _DB_PATH: Path = Path(
     os.environ.get("FEEDS_DB_PATH") or Path("~/.feeds/feeds.db").expanduser()
@@ -42,11 +42,13 @@ class _FeedLinkFinder(HTMLParser):
             self.feeds.append((href, title))
 
 
-FEED_MIME_TYPES = frozenset({
-    "application/rss+xml",
-    "application/atom+xml",
-    "application/feed+json",
-})
+FEED_MIME_TYPES = frozenset(
+    {
+        "application/rss+xml",
+        "application/atom+xml",
+        "application/feed+json",
+    }
+)
 
 _FEED_PATHS: tuple[str, ...] = (
     "/feed/",
@@ -73,7 +75,7 @@ def _parse_link_header(header_value: str, base_url: str) -> list[tuple[str, str]
     """
     feeds: list[tuple[str, str]] = []
     try:
-        links = parse_header_links(header_value)
+        links: list[dict[str, str]] = parse_header_links(header_value)
     except Exception:
         return feeds
 
@@ -122,14 +124,14 @@ def _try_common_paths(url: str) -> list[tuple[str, str]]:
             seen.add(feed_url)
 
             try:
-                resp = requests.get(
+                resp: requests.Response = requests.get(
                     feed_url,
                     timeout=3,
                     headers={"User-Agent": "feeds/0.1"},
                     allow_redirects=True,
                 )
                 resp.raise_for_status()
-                parsed_feed = feedparser.parse(resp.content)
+                parsed_feed: feedparser.FeedParserDict = feedparser.parse(resp.content)
                 if parsed_feed.version:
                     feed_data = parsed_feed.feed
                     title = (
@@ -223,7 +225,7 @@ class FeedReader:
                 feeds.append((href, title))
 
         try:
-            resp = requests.get(
+            resp: requests.Response = requests.get(
                 url,
                 timeout=10,
                 headers={"User-Agent": "feeds/0.1"},
@@ -235,19 +237,19 @@ class FeedReader:
             return []
 
         # --- Method 1: Try to parse as a feed directly ---
-        parsed = feedparser.parse(resp.content)
+        parsed: feedparser.FeedParserDict = feedparser.parse(resp.content)
         if parsed.version:
             feed = parsed.feed
             title = feed.get("title", "") if isinstance(feed, dict) else ""
             _add(url, title or url)
             return feeds  # It IS a feed; skip remaining methods.
 
-        content_type = resp.headers.get("Content-Type", "")
+        content_type: str = resp.headers.get("Content-Type", "")
         is_html = "text/html" in content_type or "application/xhtml" in content_type
 
         # --- Method 2: HTML <link> tags ---
         if is_html:
-            finder = _FeedLinkFinder()
+            finder: _FeedLinkFinder = _FeedLinkFinder()
             try:
                 finder.feed(resp.text)
             except Exception:
@@ -257,7 +259,7 @@ class FeedReader:
                     _add(urljoin(resp.url, href), title)
 
         # --- Method 3: HTTP Link headers ---
-        link_header = resp.headers.get("Link", "")
+        link_header: str = resp.headers.get("Link", "")
         if link_header:
             for href, title in _parse_link_header(link_header, resp.url):
                 _add(href, title)
