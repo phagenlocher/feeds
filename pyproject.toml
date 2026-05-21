@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "reader>=3.24,<3.25",
-    "PySide6"
+    "PySide6",
+    "requests>=2.31",
+    "feedparser>=6.0",
 ]
 
 [dependency-groups]

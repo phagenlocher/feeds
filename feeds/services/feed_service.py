@@ -88,6 +88,23 @@ class FeedService:
     ) -> None:
         self.run(lambda: self._reader.add_feed(url), on_done, on_error)
 
+    def discover_feeds(
+        self,
+        url: str,
+        on_done: Callable[[list[tuple[str, str]]], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        result: list[list[tuple[str, str]]] = []
+
+        def _discover() -> None:
+            result.append(self._reader.discover_feeds(url))
+
+        def _on_done() -> None:
+            if on_done and result:
+                on_done(result[0])
+
+        self.run(_discover, _on_done, on_error)
+
     def update_feed(
         self,
         url: str,

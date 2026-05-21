@@ -2,13 +2,14 @@
 
 import logging
 import traceback
+from collections.abc import Callable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from feeds.models.feed import FeedReader
 from feeds.services.feed_service import FeedService
 from feeds.ui.delegates import TwoLineRenderer
-from feeds.ui.dialogs import AddFeedDialog
+from feeds.ui.dialogs import AddFeedChoiceDialog, AddFeedDialog
 from feeds.ui.panes import EntriesPane, FeedsPane
 
 log = logging.getLogger(__name__)
@@ -173,29 +174,105 @@ class FeedsApp(QtWidgets.QMainWindow):
 
         _service = self._service
 
+        def on_discovered(feeds: list[tuple[str, str]]) -> None:
+            if not feeds:
+                self._on_service_error("No feed found at this URL")
+                return
+
+            if len(feeds) == 1:
+                feed_url, _ = feeds[0]
+                self._add_discovered_feed(feed_url)
+                return
+
+            choice = AddFeedChoiceDialog(feeds, self)
+            if choice.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                self._set_busy(False)
+                return
+
+            selected = choice.selected_feeds
+            if not selected:
+                self._set_busy(False)
+                return
+
+            self._add_feeds_sequentially(selected, 0)
+
+        self.statusBar().showMessage("Discovering feeds…")
+        self._set_busy(True)
+        self._service.discover_feeds(
+            url, on_done=on_discovered, on_error=self._on_service_error
+        )
+
+    def _add_discovered_feed(self, feed_url: str) -> None:
+        _service = self._service
+        if _service is None:
+            return
+
         def on_added() -> None:
             self.statusBar().showMessage("Updating feed…")
             self._set_busy(True)
             _service.update_feed(
-                url,
-                on_done=lambda: self._on_add_feed_done(url),
+                feed_url,
+                on_done=lambda: self._on_add_feed_done(feed_url),
                 on_error=self._on_service_error,
             )
 
         self.statusBar().showMessage("Adding feed…")
         self._set_busy(True)
-        self._service.add_feed(url, on_done=on_added, on_error=self._on_service_error)
+        _service.add_feed(
+            feed_url, on_done=on_added, on_error=self._on_service_error
+        )
 
-    def _on_add_feed_done(self, url: str) -> None:
+    def _add_feeds_sequentially(
+        self, feeds: list[tuple[str, str]], index: int
+    ) -> None:
+        if index >= len(feeds):
+            if self.reader is None:
+                return
+            self._set_busy(False)
+            self.feeds_pane.refresh(self.reader)
+            self.statusBar().showMessage("Feeds added", 3000)
+            return
+
+        _service = self._service
+        if _service is None:
+            return
+
+        feed_url, _ = feeds[index]
+        total = len(feeds)
+
+        def on_added() -> None:
+            self.statusBar().showMessage(f"Updating feed {index + 1}/{total}…")
+            self._set_busy(True)
+            _service.update_feed(
+                feed_url,
+                on_done=lambda: self._on_add_feed_done(
+                    feed_url,
+                    on_next=lambda: self._add_feeds_sequentially(feeds, index + 1),
+                ),
+                on_error=self._on_service_error,
+            )
+
+        self.statusBar().showMessage(f"Adding feed {index + 1}/{total}…")
+        self._set_busy(True)
+        _service.add_feed(
+            feed_url, on_done=on_added, on_error=self._on_service_error
+        )
+
+    def _on_add_feed_done(
+        self, url: str, on_next: Callable[[], object] | None = None
+    ) -> None:
         if self.reader is None:
             return
-        self._set_busy(False)
         self.feeds_pane.refresh(self.reader)
         for i, feed in enumerate(self.feeds_pane.feeds):
             if feed.id == url:
                 self._on_feed_selected(i)
                 break
-        self.statusBar().showMessage("Feed added", 3000)
+        if on_next:
+            on_next()
+        else:
+            self._set_busy(False)
+            self.statusBar().showMessage("Feed added", 3000)
 
     def _on_update_feeds(self) -> None:
         if self._service is None:
