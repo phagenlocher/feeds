@@ -14,6 +14,9 @@ import reader
 import requests
 from requests.utils import parse_header_links
 
+from feeds.discovery.medium import try_medium
+from feeds.discovery.reddit import try_reddit
+from feeds.discovery.substack import try_substack
 from feeds.discovery.youtube import try_youtube
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -29,15 +32,24 @@ class _FeedLinkFinder(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.feeds: list[tuple[str, str]] = []
+        self.base_href: str | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attrs_dict = {k.lower(): v for k, v in attrs if v is not None}
+
+        if tag == "base":
+            href = attrs_dict.get("href", "")
+            if href:
+                self.base_href = href
+            return
+
         if tag != "link":
             return
-        attrs_dict = {k.lower(): v for k, v in attrs if v is not None}
-        rel = attrs_dict.get("rel", "")
+
+        rel = attrs_dict.get("rel", "").strip()
         link_type = attrs_dict.get("type", "")
         href = attrs_dict.get("href", "")
-        if rel == "alternate" and href and link_type in FEED_MIME_TYPES:
+        if href and "alternate" in rel.split() and link_type in FEED_MIME_TYPES:
             title = attrs_dict.get("title", href)
             self.feeds.append((href, title))
 
@@ -54,10 +66,14 @@ _FEED_PATHS: tuple[str, ...] = (
     "/feed/",
     "/feed",
     "/feed.xml",
+    "/feed.json",
     "/index.xml",
     "/atom.xml",
+    "/atom",
     "/rss",
+    "/rss/",
     "/rss.xml",
+    "/blog?format=rss",
     "/feeds/posts/default",
 )
 
@@ -202,16 +218,29 @@ class FeedReader:
         Returns:
             ``[(feed_url, title), ...]``, or ``[]`` if nothing was found.
 
-        .. note::
+         .. note::
 
-            YouTube URLs are handled by a specialised pre-check
-            (:func:`feeds.discovery.youtube.try_youtube`) that runs
-            **before** any HTTP request, because YouTube serves a
-            GDPR consent wall instead of the actual page to
-            automated clients.
+            Several platforms get specialised pre-handlers that run
+            **before** any HTTP request to the URL itself:
+
+            * :func:`feeds.discovery.substack.try_substack`
+            * :func:`feeds.discovery.medium.try_medium`
+            * :func:`feeds.discovery.reddit.try_reddit`
+            * :func:`feeds.discovery.youtube.try_youtube`
+
+            YouTube in particular serves a GDPR consent wall instead
+            of the actual page, so fetching it directly never works.
         """
-        # YouTube pre-handler (bypasses GDPR consent wall —
-        # never fetch YouTube HTML pages directly).
+        # Platform-specific pre-handlers (before HTTP request).
+        feeds = try_substack(url)
+        if feeds:
+            return feeds
+        feeds = try_medium(url)
+        if feeds:
+            return feeds
+        feeds = try_reddit(url)
+        if feeds:
+            return feeds
         feeds = try_youtube(url)
         if feeds:
             return feeds
@@ -245,7 +274,7 @@ class FeedReader:
             return feeds  # It IS a feed; skip remaining methods.
 
         content_type: str = resp.headers.get("Content-Type", "")
-        is_html = "text/html" in content_type or "application/xhtml" in content_type
+        is_html = "text/html" in content_type or "application/xhtml+xml" in content_type
 
         # --- Method 2: HTML <link> tags ---
         if is_html:
@@ -255,8 +284,13 @@ class FeedReader:
             except Exception:
                 log.warning("Failed to parse HTML from %s", url)
             else:
+                base_url = (
+                    urljoin(resp.url, finder.base_href)
+                    if finder.base_href
+                    else resp.url
+                )
                 for href, title in finder.feeds:
-                    _add(urljoin(resp.url, href), title)
+                    _add(urljoin(base_url, href), title)
 
         # --- Method 3: HTTP Link headers ---
         link_header: str = resp.headers.get("Link", "")
