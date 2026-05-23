@@ -31,6 +31,7 @@ from requests.utils import parse_header_links
 from feeds.discovery.medium import try_medium
 from feeds.discovery.reddit import try_reddit
 from feeds.discovery.substack import try_substack
+from feeds.discovery.utils import USER_AGENT
 from feeds.discovery.youtube import try_youtube
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -210,7 +211,7 @@ def _try_common_paths(url: str) -> list[tuple[str, str]]:
                 resp: requests.Response = requests.get(
                     feed_url,
                     timeout=3,
-                    headers={"User-Agent": "feeds/0.1"},
+                    headers={"User-Agent": USER_AGENT},
                     allow_redirects=True,
                 )
                 resp.raise_for_status()
@@ -376,7 +377,7 @@ class FeedReader:
             resp: requests.Response = requests.get(
                 url,
                 timeout=10,
-                headers={"User-Agent": "feeds/0.1"},
+                headers={"User-Agent": USER_AGENT},
                 allow_redirects=True,
             )
             resp.raise_for_status()

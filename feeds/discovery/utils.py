@@ -6,6 +6,7 @@ from reader._parser import default_parser
 
 log: logging.Logger = logging.getLogger(__name__)
 
+USER_AGENT = "feeds/0.1"
 _FEED_TIMEOUT = 10
 
 
@@ -21,7 +22,7 @@ def validate_feed(feed_url: str) -> list[tuple[str, str]]:
     """
     try:
         parser = default_parser(session_timeout=_FEED_TIMEOUT)
-        parser.session_factory.user_agent = "feeds/0.1"
+        parser.session_factory.user_agent = USER_AGENT
         result = parser(feed_url)
         if result is not None:
             feed = result.feed

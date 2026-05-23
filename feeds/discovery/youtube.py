@@ -22,12 +22,12 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 
-from feeds.discovery.utils import validate_feed
+from feeds.discovery.utils import USER_AGENT, validate_feed
 
 log: logging.Logger = logging.getLogger(__name__)
 
-_USER_AGENT = "feeds/0.1"
 _OEMBED_TIMEOUT = 5
+_YOUTUBE_CLIENT_VERSION = "2.20250101.00.00"
 
 
 def try_youtube(url: str) -> list[tuple[str, str]]:
@@ -66,10 +66,12 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     # /c/NAME or /@HANDLE
     m = re.match(r"/(?:c/|@)([\w.-]+)", path)
     if m:
-        log.debug("detected YouTube handle: %s", m.group(1))
-        return validate_feed(
-            f"https://www.youtube.com/feeds/videos.xml?user={m.group(1)}"
-        )
+        log.debug("detected YouTube handle/custom URL: %s", m.group(1))
+        channel_id = _resolve_channel_id(url)
+        if channel_id:
+            return validate_feed(
+                f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+            )
 
     # /watch?v=VIDEO_ID
     if path == "/watch":
@@ -101,12 +103,50 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     return []
 
 
+def _resolve_channel_id(channel_url: str) -> str | None:
+    """Resolve a YouTube channel URL to a channel ID.
+
+    Uses the internal ``youtubei/v1/navigation/resolve_url`` API
+    which works without authentication or consent.
+    """
+    try:
+        data = {
+            "context": {
+                "client": {
+                    "clientName": "WEB",
+                    "clientVersion": _YOUTUBE_CLIENT_VERSION,
+                }
+            },
+            "url": channel_url,
+        }
+        resp: requests.Response = requests.post(
+            "https://www.youtube.com/youtubei/v1/navigation/resolve_url",
+            json=data,
+            timeout=_OEMBED_TIMEOUT,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Content-Type": "application/json",
+            },
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        endpoint = result.get("endpoint", {})
+        browse_endpoint = endpoint.get("browseEndpoint", {})
+        browse_id: str | None = browse_endpoint.get("browseId")
+        if browse_id and browse_id.startswith("UC"):
+            log.debug("resolved channel ID: %s", browse_id)
+            return browse_id
+    except Exception:
+        log.debug("Failed to resolve channel URL: %s", channel_url)
+    return None
+
+
 def _feed_from_video_id(video_id: str) -> list[tuple[str, str]]:
     """Resolve a YouTube video ID to a channel feed via oEmbed.
 
     The oEmbed endpoint (``youtube.com/oembed``) works without
-    consent and returns ``author_url``, from which we derive the
-    channel handle and construct the feed URL.
+    consent and returns ``author_url``, from which we resolve the
+    channel ID and construct the feed URL.
     """
     try:
         url = (
@@ -117,16 +157,26 @@ def _feed_from_video_id(video_id: str) -> list[tuple[str, str]]:
         resp: requests.Response = requests.get(
             url,
             timeout=_OEMBED_TIMEOUT,
-            headers={"User-Agent": _USER_AGENT},
+            headers={"User-Agent": USER_AGENT},
         )
         resp.raise_for_status()
         data = resp.json()
         author_url: str = data.get("author_url", "")
-        m: re.Match[str] | None = re.search(r"/(@?[\w.-]+)$", author_url)
-        if m:
-            handle = m.group(1).lstrip("@")
+
+        if "/user/" in author_url:
+            m: re.Match[str] | None = re.search(r"/user/([\w.-]+)", author_url)
+            if m:
+                log.debug("detected legacy user: %s", m.group(1))
+                result = validate_feed(
+                    f"https://www.youtube.com/feeds/videos.xml?user={m.group(1)}"
+                )
+                if result:
+                    return result
+
+        channel_id = _resolve_channel_id(author_url)
+        if channel_id:
             return validate_feed(
-                f"https://www.youtube.com/feeds/videos.xml?user={handle}"
+                f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
             )
     except Exception:
         log.debug("Failed to resolve YouTube video %s via oEmbed", video_id)
