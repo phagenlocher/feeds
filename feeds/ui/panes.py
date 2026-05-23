@@ -150,8 +150,14 @@ class EntriesPane(QtWidgets.QWidget):
         self.entries = list(reader.get_posts(feed))
         self.list.clear()
         for entry in self.entries:
-            ts = entry.last_updated.strftime("%Y-%m-%d") if entry.last_updated else ""
-            self.list.addItem(self.list.build_item(entry.title, ts, not entry.read))
+            parts: list[str] = []
+            if entry.author:
+                parts.append(entry.author)
+            if entry.last_updated:
+                parts.append(entry.last_updated.strftime("%Y-%m-%d"))
+            subtitle = " · ".join(parts)
+            item = self.list.build_item(entry.title, subtitle, not entry.read)
+            self.list.addItem(item)
 
     def clear(self) -> None:
         self.entries = []

@@ -259,6 +259,7 @@ class Entry:
         entry_id: Unique identifier within the feed (``reader`` internals).
         feed_id: The :attr:`Feed.id` this entry belongs to.
         read: Whether the entry has been marked as read.
+        author: Author name(s) as a string, or empty if unknown.
     """
 
     url: str
@@ -267,6 +268,7 @@ class Entry:
     entry_id: str
     feed_id: str
     read: bool
+    author: str = ""
 
 
 class FeedReader:
@@ -481,6 +483,7 @@ class FeedReader:
                 entry_id=e.id,
                 feed_id=feed.id,
                 read=e.read,
+                author=e.authors_str or "",
             )
 
     def mark_entry_as_read(self, entry: Entry) -> None:
