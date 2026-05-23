@@ -41,13 +41,16 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     """
     parsed = urlparse(url)
     if "youtube.com" not in parsed.netloc and "youtu.be" not in parsed.netloc:
+        log.debug("not a YouTube URL: %s", url)
         return []
 
     path = parsed.path.rstrip("/")
+    log.debug("checking YouTube path: %s", path)
 
     # /channel/UC_ID
     m: re.Match[str] | None = re.match(r"/channel/(UC[\w-]{22,})", path)
     if m:
+        log.debug("detected YouTube channel ID: %s", m.group(1))
         return validate_feed(
             f"https://www.youtube.com/feeds/videos.xml?channel_id={m.group(1)}"
         )
@@ -55,6 +58,7 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     # /user/NAME (legacy)
     m = re.match(r"/user/([\w.-]+)", path)
     if m:
+        log.debug("detected YouTube username: %s", m.group(1))
         return validate_feed(
             f"https://www.youtube.com/feeds/videos.xml?user={m.group(1)}"
         )
@@ -62,6 +66,7 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     # /c/NAME or /@HANDLE
     m = re.match(r"/(?:c/|@)([\w.-]+)", path)
     if m:
+        log.debug("detected YouTube handle: %s", m.group(1))
         return validate_feed(
             f"https://www.youtube.com/feeds/videos.xml?user={m.group(1)}"
         )
@@ -70,24 +75,29 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     if path == "/watch":
         video_id: str | None = parse_qs(parsed.query).get("v", [None])[0]
         if video_id:
+            log.debug("resolving YouTube video ID via oEmbed: %s", video_id)
             return _feed_from_video_id(video_id)
 
     # /shorts/VIDEO_ID
     m = re.match(r"/shorts/([\w-]+)", path)
     if m:
+        log.debug("resolving YouTube Shorts video ID via oEmbed: %s", m.group(1))
         return _feed_from_video_id(m.group(1))
 
     # /embed/VIDEO_ID
     m = re.match(r"/embed/([\w-]+)", path)
     if m:
+        log.debug("resolving YouTube embed video ID via oEmbed: %s", m.group(1))
         return _feed_from_video_id(m.group(1))
 
     # youtu.be/VIDEO_ID
     if "youtu.be" in parsed.netloc:
         video_id = path.lstrip("/")
         if video_id and "/" not in video_id:
+            log.debug("resolving youtu.be video ID via oEmbed: %s", video_id)
             return _feed_from_video_id(video_id)
 
+    log.debug("YouTube path %s did not match any known pattern", path)
     return []
 
 

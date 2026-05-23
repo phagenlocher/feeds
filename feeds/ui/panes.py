@@ -1,5 +1,6 @@
 """Left (FeedsPane) and right (EntriesPane) panes with context menus."""
 
+import logging
 import typing
 import webbrowser
 from dataclasses import replace
@@ -9,6 +10,8 @@ from PySide6 import QtCore, QtWidgets
 
 from feeds.models.feed import Entry, Feed, FeedReader
 from feeds.ui.widgets import FeedListWidget
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 def _feed_label(feed: Feed, unread_count: int) -> str:
@@ -99,10 +102,13 @@ class FeedsPane(QtWidgets.QWidget):
         if action is None:
             return
         kind = FeedMenuAction(action.data())
+        feed = self.feeds[index]
         match kind:
             case FeedMenuAction.COPY_URL:
-                QtWidgets.QApplication.clipboard().setText(self.feeds[index].id)
+                log.info("copied feed URL: %s", feed.id)
+                QtWidgets.QApplication.clipboard().setText(feed.id)
             case FeedMenuAction.READ_ALL:
+                log.info("mark all as read requested for feed %s", feed.id)
                 self.read_all_requested.emit(index)
             case FeedMenuAction.REMOVE:
                 confirm = QtWidgets.QMessageBox.question(
@@ -114,6 +120,7 @@ class FeedsPane(QtWidgets.QWidget):
                     QtWidgets.QMessageBox.StandardButton.No,
                 )
                 if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
+                    log.info("remove feed confirmed: %s", feed.id)
                     self.remove_feed_requested.emit(index)
             case _ as unreachable:
                 typing.assert_never(unreachable)
@@ -184,6 +191,7 @@ class EntriesPane(QtWidgets.QWidget):
         entry = self.entries[index]
         if not entry.read:
             self.entry_activated.emit(index)
+        log.info("opening entry in browser: %s", entry.url)
         webbrowser.open(entry.url)
 
     def _on_context_menu(self, pos: QtCore.QPoint) -> None:
@@ -206,8 +214,10 @@ class EntriesPane(QtWidgets.QWidget):
         kind = EntryMenuAction(action.data())
         match kind:
             case EntryMenuAction.MARK_READ:
+                log.info("mark read requested for entry %s", entry.url)
                 self.entry_read_requested.emit(index)
             case EntryMenuAction.MARK_UNREAD:
+                log.info("mark unread requested for entry %s", entry.url)
                 self.entry_unread_requested.emit(index)
             case _ as unreachable:
                 typing.assert_never(unreachable)

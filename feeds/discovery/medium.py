@@ -11,10 +11,13 @@ Custom domains mapped to Medium are not handled here — they fall through
 to generic path probing (HTML ``<link>`` tags and common paths).
 """
 
+import logging
 import re
 from urllib.parse import urlparse
 
 from feeds.discovery.utils import validate_feed
+
+log: logging.Logger = logging.getLogger(__name__)
 
 # Regex matching Medium paths that are definitely not user profiles
 # or publication pages.  These are internal or utility routes that
@@ -45,17 +48,21 @@ def try_medium(url: str) -> list[tuple[str, str]]:
     """
     parsed = urlparse(url)
     if "medium.com" not in parsed.netloc:
+        log.debug("not a Medium URL: %s", url)
         return []
 
     path = parsed.path.rstrip("/")
     if not path:
+        log.debug("Medium URL has no path: %s", url)
         return []
 
     if _SKIP_PATHS.match(path):
+        log.debug("Medium non-feed path skipped: %s", path)
         return []
 
     # Take only the first path segment (ignore article titles, etc.).
     medium_path = path.strip("/").split("/")[0]
 
+    log.info("detected Medium publication/user: %s", medium_path)
     feed_url = f"https://medium.com/feed/{medium_path}"
     return validate_feed(feed_url)

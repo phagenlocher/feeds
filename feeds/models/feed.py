@@ -302,6 +302,7 @@ class FeedReader:
         Args:
             url: The feed URL to add.
         """
+        log.info("subscribing to feed %s", url)
         self.reader.add_feed(url, exist_ok=True)
 
     @staticmethod
@@ -340,18 +341,28 @@ class FeedReader:
             ``[(feed_url, title), ...]``, or ``[]`` if nothing was found.
         """
         # Platform-specific pre-handlers (before HTTP request).
+        log.debug("trying platform handlers for %s", url)
         feeds = try_substack(url)
         if feeds:
+            log.debug("Substack handler returned %d feed(s)", len(feeds))
             return feeds
+        log.debug("not a Substack URL")
         feeds = try_medium(url)
         if feeds:
+            log.debug("Medium handler returned %d feed(s)", len(feeds))
             return feeds
+        log.debug("not a Medium URL")
         feeds = try_reddit(url)
         if feeds:
+            log.debug("Reddit handler returned %d feed(s)", len(feeds))
             return feeds
+        log.debug("not a Reddit URL")
         feeds = try_youtube(url)
         if feeds:
+            log.debug("YouTube handler returned %d feed(s)", len(feeds))
             return feeds
+        log.debug("not a YouTube URL")
+        log.debug("no platform handler matched, fetching %s for HTML scan", url)
 
         feeds: list[tuple[str, str]] = []
         seen: set[str] = set()
@@ -376,16 +387,19 @@ class FeedReader:
         # --- Method 1: Try to parse as a feed directly ---
         parsed: feedparser.FeedParserDict = feedparser.parse(resp.content)
         if parsed.version:
+            log.debug("%s is a feed directly (version=%s)", url, parsed.version)
             feed = parsed.feed
             title = feed.get("title", "") if isinstance(feed, dict) else ""
             _add(url, title or url)
             return feeds  # It IS a feed; skip remaining methods.
+        log.debug("%s is not a feed (version=%s)", url, parsed.version)
 
         content_type: str = resp.headers.get("Content-Type", "")
         is_html = "text/html" in content_type or "application/xhtml+xml" in content_type
 
         # --- Method 2: HTML <link> tags ---
         if is_html:
+            log.debug("scanning HTML <link> tags for feed references")
             finder: _FeedLinkFinder = _FeedLinkFinder()
             try:
                 finder.feed(resp.text)
@@ -397,19 +411,36 @@ class FeedReader:
                     if finder.base_href
                     else resp.url
                 )
+                log.debug("found %d feed(s) via <link> tags", len(finder.feeds))
                 for href, title in finder.feeds:
+                    log.debug("  <link> feed: %s (%s)", href, title)
                     _add(urljoin(base_url, href), title)
+        else:
+            log.debug("content type is %s, skipping HTML scan", content_type)
 
         # --- Method 3: HTTP Link headers ---
         link_header: str = resp.headers.get("Link", "")
         if link_header:
+            log.debug("parsing HTTP Link headers")
             for href, title in _parse_link_header(link_header, resp.url):
+                log.debug("  Link header feed: %s (%s)", href, title)
                 _add(href, title)
+        else:
+            log.debug("no Link headers found")
 
         # --- Method 4: Common path probing (last resort, only for HTML) ---
         if not feeds and is_html:
-            for href, title in _try_common_paths(resp.url):
+            log.debug("no feeds found yet, probing common paths on %s", resp.url)
+            path_feeds = _try_common_paths(resp.url)
+            log.debug("common path probing returned %d feed(s)", len(path_feeds))
+            for href, title in path_feeds:
                 _add(href, title)
+        elif feeds:
+            log.debug(
+                "skipping common path probing (already found %d feed(s))", len(feeds)
+            )
+        else:
+            log.debug("skipping common path probing (content type %s)", content_type)
 
         return feeds
 
@@ -425,7 +456,9 @@ class FeedReader:
         Returns:
             ``[(feed_url, title), ...]``.
         """
+        log.info("discovering feeds from %s", url)
         self._last_discovered_feeds = self._discover_feed_urls(url)
+        log.info("discovered %d feed(s)", len(self._last_discovered_feeds))
         return self._last_discovered_feeds
 
     @property
@@ -439,6 +472,7 @@ class FeedReader:
 
     def update_feeds(self) -> None:
         """Fetch new entries for all subscribed feeds."""
+        log.info("updating all feeds")
         feed_count: int = len(list(self.reader.get_feeds()))
         workers: int = min(feed_count, (os.cpu_count() or 1) * 2)
         self.reader.update_feeds(workers=workers)
@@ -449,6 +483,7 @@ class FeedReader:
         Args:
             feed_url: The URL of the feed to update.
         """
+        log.info("updating feed %s", feed_url)
         self.reader.update_feed(feed_url)
 
     def get_feeds(self) -> Iterator[Feed]:
@@ -492,6 +527,7 @@ class FeedReader:
         Args:
             entry: The entry to mark.
         """
+        log.info("marking entry read: %s", entry.entry_id)
         self.reader.mark_entry_as_read((entry.feed_id, entry.entry_id))
 
     def mark_entry_as_unread(self, entry: Entry) -> None:
@@ -500,6 +536,7 @@ class FeedReader:
         Args:
             entry: The entry to mark.
         """
+        log.info("marking entry unread: %s", entry.entry_id)
         self.reader.mark_entry_as_unread((entry.feed_id, entry.entry_id))
 
     def delete_feed(self, feed: Feed) -> None:
@@ -508,6 +545,7 @@ class FeedReader:
         Args:
             feed: The feed to delete.
         """
+        log.info("unsubscribing feed %s", feed.id)
         self.reader.delete_feed(feed.id)
 
     def mark_all_as_read(self, feed: Feed) -> None:
@@ -516,6 +554,7 @@ class FeedReader:
         Args:
             feed: The feed whose entries should be marked read.
         """
+        log.info("marking all entries read in feed %s", feed.id)
         for e in self.reader.get_entries(feed=feed.id):
             self.reader.mark_entry_as_read((feed.id, e.id))
 

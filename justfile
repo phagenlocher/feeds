@@ -24,5 +24,5 @@ format:
 lint:
     uv run basedpyright .
 
-run:
-    uv run python -m feeds
+run *args:
+    uv run python -m feeds {{args}}

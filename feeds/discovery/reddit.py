@@ -13,10 +13,13 @@ types in its HTML, so the generic discovery pipeline (HTML parsing,
 essential for Reddit support.
 """
 
+import logging
 import re
 from urllib.parse import urlparse
 
 from feeds.discovery.utils import validate_feed
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 def try_reddit(url: str) -> list[tuple[str, str]]:
@@ -41,18 +44,23 @@ def try_reddit(url: str) -> list[tuple[str, str]]:
     """
     parsed = urlparse(url)
     if "reddit.com" not in parsed.netloc:
+        log.debug("not a Reddit URL: %s", url)
         return []
 
     path = parsed.path.rstrip("/")
+    log.debug("checking Reddit path: %s", path)
 
     # /r/SUBREDDIT — extract subreddit name from the path.
     m: re.Match[str] | None = re.match(r"/r/([\w]+)", path)
     if m:
+        log.info("detected Reddit subreddit: r/%s", m.group(1))
         return validate_feed(f"https://www.reddit.com/r/{m.group(1)}/.rss")
 
     # /user/USERNAME — extract username from the path.
     m = re.match(r"/user/([\w-]+)", path)
     if m:
+        log.info("detected Reddit user: u/%s", m.group(1))
         return validate_feed(f"https://www.reddit.com/user/{m.group(1)}/.rss")
 
+    log.debug("Reddit path %s did not match subreddit or user pattern", path)
     return []

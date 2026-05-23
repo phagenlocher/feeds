@@ -123,6 +123,7 @@ class FeedsApp(QtWidgets.QMainWindow):
             self.statusBar().showMessage("")
 
     def _on_service_error(self, msg: str) -> None:
+        log.error("Service error: %s", msg)
         self._set_busy(False)
         self.statusBar().showMessage(f"Error: {msg}", 5000)
 
@@ -132,6 +133,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._selected_feed_index = index
         self.feeds_pane.select(index)
         feed = self.feeds_pane.feeds[index]
+        log.info("feed selected: %s", feed.id)
         self.entries_pane.show_entries(feed, self.reader)
 
     def _update_feed_font(self) -> None:
@@ -155,12 +157,15 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._update_feed_font()
 
     def _on_entry_activated(self, index: int) -> None:
+        log.info("entry activated at index %d", index)
         self._toggle_entry_read(index, True)
 
     def _on_entry_read(self, index: int) -> None:
+        log.info("marking entry read at index %d", index)
         self._toggle_entry_read(index, True)
 
     def _on_entry_unread(self, index: int) -> None:
+        log.info("marking entry unread at index %d", index)
         self._toggle_entry_read(index, False)
 
     def _on_add_feed(self) -> None:
@@ -169,11 +174,13 @@ class FeedsApp(QtWidgets.QMainWindow):
 
         dialog = AddFeedDialog(self)
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            log.info("add feed cancelled by user")
             return
         url = dialog.url
         if not url:
             return
 
+        log.info("add feed button clicked: %s", url)
         _service = self._service
 
         def on_discovered(feeds: list[tuple[str, str]]) -> None:
@@ -183,11 +190,13 @@ class FeedsApp(QtWidgets.QMainWindow):
 
             if len(feeds) == 1:
                 feed_url, _ = feeds[0]
+                log.info("single feed discovered, adding: %s", feed_url)
                 self._add_discovered_feed(feed_url)
                 return
 
             choice = AddFeedChoiceDialog(feeds, self)
             if choice.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                log.info("feed choice cancelled by user")
                 self._set_busy(False)
                 return
 
@@ -259,6 +268,7 @@ class FeedsApp(QtWidgets.QMainWindow):
     ) -> None:
         if self.reader is None:
             return
+        log.info("feed added: %s", url)
         self.feeds_pane.refresh(self.reader)
         for i, feed in enumerate(self.feeds_pane.feeds):
             if feed.id == url:
@@ -273,6 +283,7 @@ class FeedsApp(QtWidgets.QMainWindow):
     def _on_update_feeds(self) -> None:
         if self._service is None:
             return
+        log.info("update feeds button clicked")
         self.statusBar().showMessage("Updating feeds…")
         self._set_busy(True)
         self._service.update_feeds(
@@ -283,6 +294,7 @@ class FeedsApp(QtWidgets.QMainWindow):
     def _on_update_feeds_done(self) -> None:
         if self.reader is None:
             return
+        log.info("feeds updated")
         self._set_busy(False)
         self.feeds_pane.refresh(self.reader)
         if self._selected_feed_index is not None and self._selected_feed_index < len(
@@ -299,6 +311,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         if self._service is None:
             return
         feed = self.feeds_pane.feeds[index]
+        log.info("removing feed: %s", feed.id)
         self.statusBar().showMessage(f"Removing {feed.title}…")
         self._set_busy(True)
         self._service.delete_feed(
@@ -310,6 +323,7 @@ class FeedsApp(QtWidgets.QMainWindow):
     def _on_remove_feed_done(self) -> None:
         if self.reader is None:
             return
+        log.info("feed removed")
         self._set_busy(False)
         self._selected_feed_index = None
         self.feeds_pane.refresh(self.reader)
@@ -320,6 +334,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         if self._service is None:
             return
         feed = self.feeds_pane.feeds[index]
+        log.info("marking all as read in feed: %s", feed.id)
         self.statusBar().showMessage("Marking all as read…")
         self._set_busy(True)
         self._service.mark_all_as_read(
@@ -331,6 +346,7 @@ class FeedsApp(QtWidgets.QMainWindow):
     def _on_read_all_done(self) -> None:
         if self.reader is None:
             return
+        log.info("all entries marked as read")
         self._set_busy(False)
         self.feeds_pane.refresh(self.reader)
         if self._selected_feed_index is not None:

@@ -10,9 +10,12 @@ subdomain.  This handler extracts the subdomain and constructs the feed
 URL directly, avoiding a full page fetch.
 """
 
+import logging
 from urllib.parse import urlparse
 
 from feeds.discovery.utils import validate_feed
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 def try_substack(url: str) -> list[tuple[str, str]]:
@@ -37,12 +40,15 @@ def try_substack(url: str) -> list[tuple[str, str]]:
     parsed = urlparse(url)
     hostname = parsed.hostname or ""
     if not hostname.endswith(".substack.com"):
+        log.debug("not a Substack URL: %s", url)
         return []
 
     # Extract the newsletter name by stripping the ".substack.com" suffix.
     subdomain = hostname.removesuffix(".substack.com")
     if not subdomain:
+        log.debug("Substack URL has no subdomain: %s", hostname)
         return []
 
+    log.info("detected Substack newsletter: %s", subdomain)
     feed_url = f"https://{hostname}/feed"
     return validate_feed(feed_url)

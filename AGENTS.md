@@ -18,3 +18,7 @@
 - Use `match`/`case` with `typing.assert_never` for dispatching on enums and sumtypes
 - Annotate variable assignments from function calls when the return type is not trivially inferable from the call itself (e.g., `log: Logger = logging.getLogger(...)`, `m: re.Match | None = re.match(...)`)
   Constructor calls (`Foo()`) and well-known stdlib functions (`len()`, `bool()`) need no annotation.
+- Always add `logging` to every Python module. Use `log: logging.Logger = logging.getLogger(__name__)`.
+  - **INFO** — user actions (button clicks, menu actions), DB inserts/updates/deletes, state-changing operations, action completions.
+  - **ERROR** — actions that are aborted (e.g., exceptions that prevent the operation from completing).
+  - **WARNING** — recoverable errors (e.g., a network call failed but the operation can continue, a parse error on one of several feeds).

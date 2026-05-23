@@ -1,8 +1,11 @@
 """Feed-related dialogs."""
 
+import logging
 from urllib.parse import urlparse
 
 from PySide6 import QtWidgets
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 class AddFeedDialog(QtWidgets.QDialog):
@@ -22,10 +25,14 @@ class AddFeedDialog(QtWidgets.QDialog):
 
         self.add_btn: QtWidgets.QPushButton = QtWidgets.QPushButton("Add")
         self.add_btn.setEnabled(False)
-        self.add_btn.clicked.connect(self.accept)
-        self.url_input.returnPressed.connect(self.accept)
+        self.add_btn.clicked.connect(self._on_accepted)
+        self.url_input.returnPressed.connect(self._on_accepted)
         self.url_input.textChanged.connect(self._validate)
         layout.addWidget(self.add_btn)
+
+    def _on_accepted(self) -> None:
+        log.info("add feed dialog accepted: %s", self.url)
+        self.accept()
 
     def _validate(self, text: str) -> None:
         parsed = urlparse(text.strip())
@@ -69,9 +76,17 @@ class AddFeedChoiceDialog(QtWidgets.QDialog):
 
         add_btn = QtWidgets.QPushButton("Add Selected")
         add_btn.setDefault(True)
-        add_btn.clicked.connect(self.accept)
+        add_btn.clicked.connect(self._on_accepted)
         btn_layout.addWidget(add_btn)
         layout.addLayout(btn_layout)
+
+    def _on_accepted(self) -> None:
+        selected = self.selected_feeds
+        log.info(
+            "feed choice dialog accepted: %d feed(s)",
+            len(selected),
+        )
+        self.accept()
 
     @property
     def selected_feeds(self) -> list[tuple[str, str]]:
