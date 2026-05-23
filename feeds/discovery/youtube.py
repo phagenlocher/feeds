@@ -20,14 +20,14 @@ import logging
 import re
 from urllib.parse import parse_qs, urlparse
 
-import feedparser
 import requests
+
+from feeds.discovery.utils import validate_feed
 
 log: logging.Logger = logging.getLogger(__name__)
 
 _USER_AGENT = "feeds/0.1"
 _OEMBED_TIMEOUT = 5
-_FEED_TIMEOUT = 10
 
 
 def try_youtube(url: str) -> list[tuple[str, str]]:
@@ -48,21 +48,21 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     # /channel/UC_ID
     m: re.Match[str] | None = re.match(r"/channel/(UC[\w-]{22,})", path)
     if m:
-        return _validate_feed(
+        return validate_feed(
             f"https://www.youtube.com/feeds/videos.xml?channel_id={m.group(1)}"
         )
 
     # /user/NAME (legacy)
     m = re.match(r"/user/([\w.-]+)", path)
     if m:
-        return _validate_feed(
+        return validate_feed(
             f"https://www.youtube.com/feeds/videos.xml?user={m.group(1)}"
         )
 
     # /c/NAME or /@HANDLE
     m = re.match(r"/(?:c/|@)([\w.-]+)", path)
     if m:
-        return _validate_feed(
+        return validate_feed(
             f"https://www.youtube.com/feeds/videos.xml?user={m.group(1)}"
         )
 
@@ -91,29 +91,6 @@ def try_youtube(url: str) -> list[tuple[str, str]]:
     return []
 
 
-def _validate_feed(feed_url: str) -> list[tuple[str, str]]:
-    """Validate *feed_url* with ``feedparser``.
-
-    Returns ``[(feed_url, title)]`` if the URL is a valid feed,
-    ``[]`` otherwise.
-    """
-    try:
-        resp: requests.Response = requests.get(
-            feed_url,
-            timeout=_FEED_TIMEOUT,
-            headers={"User-Agent": _USER_AGENT},
-        )
-        resp.raise_for_status()
-        parsed: feedparser.FeedParserDict = feedparser.parse(resp.content)
-        if parsed.version:
-            feed = parsed.feed
-            title = feed.get("title", "") if isinstance(feed, dict) else ""
-            return [(feed_url, title or feed_url)]
-    except Exception:
-        log.debug("YouTube feed %s is not valid", feed_url)
-    return []
-
-
 def _feed_from_video_id(video_id: str) -> list[tuple[str, str]]:
     """Resolve a YouTube video ID to a channel feed via oEmbed.
 
@@ -138,7 +115,7 @@ def _feed_from_video_id(video_id: str) -> list[tuple[str, str]]:
         m: re.Match[str] | None = re.search(r"/(@?[\w.-]+)$", author_url)
         if m:
             handle = m.group(1).lstrip("@")
-            return _validate_feed(
+            return validate_feed(
                 f"https://www.youtube.com/feeds/videos.xml?user={handle}"
             )
     except Exception:
