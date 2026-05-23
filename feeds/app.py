@@ -119,6 +119,8 @@ class FeedsApp(QtWidgets.QMainWindow):
             return
         self._update_action.setEnabled(not busy)
         self._update_action.setText("Updating…" if busy else "Update Feeds")
+        if not busy:
+            self.statusBar().showMessage("")
 
     def _on_service_error(self, msg: str) -> None:
         self._set_busy(False)
