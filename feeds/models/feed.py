@@ -436,12 +436,10 @@ class FeedReader:
         return self._last_discovered_feeds
 
     def update_feeds(self) -> None:
-        """Fetch new entries for all subscribed feeds.
-
-        Iterates over every feed in the database and fetches the
-        latest content from its URL.
-        """
-        self.reader.update_feeds()
+        """Fetch new entries for all subscribed feeds."""
+        feed_count: int = len(list(self.reader.get_feeds()))
+        workers: int = min(feed_count, (os.cpu_count() or 1) * 2)
+        self.reader.update_feeds(workers=workers)
 
     def update_feed(self, feed_url: str) -> None:
         """Fetch new entries for a single feed.
