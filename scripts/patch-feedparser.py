@@ -49,7 +49,7 @@ new_block = """    def parse_starttag(self, i):
 src = src.replace(old_block, new_block)
 
 with open(path, "w") as f:
-    f.write(src)
+    _ = f.write(src)
 
 assert "goahead.__code__" not in src, "patch failed: __code__ still in file"
 assert "__parse_starttag.__code__" not in src, "patch failed: __parse_starttag still in file"
