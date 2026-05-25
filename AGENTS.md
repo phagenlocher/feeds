@@ -22,3 +22,8 @@
   - **INFO** — user actions (button clicks, menu actions), DB inserts/updates/deletes, state-changing operations, action completions.
   - **ERROR** — actions that are aborted (e.g., exceptions that prevent the operation from completing).
   - **WARNING** — recoverable errors (e.g., a network call failed but the operation can continue, a parse error on one of several feeds).
+
+## Docs
+- `docs/gui.md` — GUI architecture (FeedsApp, panes, widgets, delegates, dialogs, async threading)
+- `docs/rss-atom.md` — RSS/Atom handling (FeedReader, data models, storage, feed updating, read state)
+- `docs/discovery.md` — Feed discovery pipeline (platform handlers, HTML autodiscovery, Link headers, path probing)
