@@ -74,6 +74,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self.feeds_pane.feed_selected.connect(self._on_feed_selected)
         self.feeds_pane.read_all_requested.connect(self._read_all_async)
         self.feeds_pane.remove_feed_requested.connect(self._remove_feed_async)
+        self.feeds_pane.update_feed_requested.connect(self._update_single_feed)
         splitter.addWidget(self.feeds_pane)
 
         self.entries_pane = EntriesPane(delegate, self)
@@ -306,6 +307,35 @@ class FeedsApp(QtWidgets.QMainWindow):
         else:
             self.entries_pane.clear()
         self.statusBar().showMessage("Feeds updated", 3000)
+
+    def _update_single_feed(self, index: int) -> None:
+        if self._service is None:
+            return
+        feed = self.feeds_pane.feeds[index]
+        log.info("update single feed requested: %s", feed.id)
+        self.statusBar().showMessage(f"Updating {feed.title}…")
+        self._set_busy(True)
+        self._service.update_feed(
+            feed.id,
+            on_done=self._on_update_single_feed_done,
+            on_error=self._on_service_error,
+        )
+
+    def _on_update_single_feed_done(self) -> None:
+        if self.reader is None:
+            return
+        log.info("single feed updated")
+        self._set_busy(False)
+        self.feeds_pane.refresh(self.reader)
+        if self._selected_feed_index is not None and self._selected_feed_index < len(
+            self.feeds_pane.feeds
+        ):
+            feed = self.feeds_pane.feeds[self._selected_feed_index]
+            self.entries_pane.show_entries(feed, self.reader)
+            self.feeds_pane.select(self._selected_feed_index)
+        else:
+            self.entries_pane.clear()
+        self.statusBar().showMessage("Feed updated", 3000)
 
     def _remove_feed_async(self, index: int) -> None:
         if self._service is None:

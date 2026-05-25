@@ -49,6 +49,7 @@ instantiates `FeedsApp`, and enters the Qt event loop.
 | `FeedsPane.feed_selected(int)` | `_on_feed_selected` (line 130) | Populates `EntriesPane` with entries for the chosen feed |
 | `FeedsPane.read_all_requested(int)` | `_read_all_async` (line 333) | Marks all entries in a feed as read |
 | `FeedsPane.remove_feed_requested(int)` | `_remove_feed_async` (line 310) | Unsubscribes and deletes a feed |
+| `FeedsPane.update_feed_requested(int)` | `_update_single_feed` (line 310) | Manually updates a single feed |
 | `EntriesPane.entry_activated(int)` | `_on_entry_activated` (line 159) | Marks entry read + opens URL in system browser |
 | `EntriesPane.entry_read_requested(int)` | `_on_entry_read` (line 163) | Marks a single entry as read |
 | `EntriesPane.entry_unread_requested(int)` | `_on_entry_unread` (line 167) | Marks a single entry as unread |
@@ -75,6 +76,7 @@ Shows the list of subscribed feeds with unread counts. Uses a
 | `feed_selected` | `int` (row index) | User clicks a feed |
 | `read_all_requested` | `int` (row index) | "Mark all as read" context menu |
 | `remove_feed_requested` | `int` (row index) | "Remove feed" context menu |
+| `update_feed_requested` | `int` (row index) | "Update feed" context menu |
 
 ### Display
 
@@ -92,6 +94,7 @@ Right-click on a feed:
 | Mark all as read | Emits `read_all_requested` |
 | Remove feed | Shows confirmation `QMessageBox`, then emits `remove_feed_requested` |
 | Copy URL | Copies feed URL to system clipboard |
+| Update feed | Emits `update_feed_requested` to trigger a single-feed background update |
 
 Uses `match`/`case` with `typing.assert_never` for exhaustive dispatch
 on the `FeedMenuAction` enum.

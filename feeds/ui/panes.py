@@ -22,6 +22,7 @@ class FeedMenuAction(IntEnum):
     COPY_URL = auto()
     READ_ALL = auto()
     REMOVE = auto()
+    UPDATE = auto()
 
 
 class EntryMenuAction(IntEnum):
@@ -35,6 +36,7 @@ class FeedsPane(QtWidgets.QWidget):
     feed_selected: QtCore.Signal = QtCore.Signal(int)
     read_all_requested: QtCore.Signal = QtCore.Signal(int)
     remove_feed_requested: QtCore.Signal = QtCore.Signal(int)
+    update_feed_requested: QtCore.Signal = QtCore.Signal(int)
 
     def __init__(
         self,
@@ -97,6 +99,8 @@ class FeedsPane(QtWidgets.QWidget):
         act.setData(FeedMenuAction.REMOVE)
         act = menu.addAction("Copy URL")
         act.setData(FeedMenuAction.COPY_URL)
+        act = menu.addAction("Update feed")
+        act.setData(FeedMenuAction.UPDATE)
 
         action = menu.exec(self.list.viewport().mapToGlobal(pos))
         if action is None:
@@ -122,6 +126,9 @@ class FeedsPane(QtWidgets.QWidget):
                 if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
                     log.info("remove feed confirmed: %s", feed.id)
                     self.remove_feed_requested.emit(index)
+            case FeedMenuAction.UPDATE:
+                log.info("update feed requested: %s", feed.id)
+                self.update_feed_requested.emit(index)
             case _ as unreachable:
                 typing.assert_never(unreachable)
 
