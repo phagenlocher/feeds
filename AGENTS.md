@@ -1,5 +1,9 @@
 # feeds — RSS Reader
 
+## Rules for agents
+- Linting and formatting must be checked and fixed after every code change.
+- When planning, always check if documentation (README.md, AGENTS.md, docs/) needs updates and plan accordingly.
+
 ## Commands
 - `just run` — run the app
 - `just build` — build PyInstaller binary (output: dist/main)
