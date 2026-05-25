@@ -18,6 +18,9 @@ build: _static-venv
       feeds
     rm -rf dist/*.build dist/*.dist dist/*.onefile-build
 
+install: build
+    cp dist/feeds ~/.local/bin/
+
 format:
     uv run ruff format feeds/
 
