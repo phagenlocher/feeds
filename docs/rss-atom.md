@@ -66,7 +66,7 @@ overridden with the `FEEDS_DB_PATH` environment variable.
 |--------|------|-------------|
 | `add_feed(url)` | 298 | Subscribe to a feed (no-op if already subscribed) |
 | `discover_feeds(url)` | 448 | Discover feed URLs from a page, caches results |
-| `update_feeds()` | 474 | Update all feeds with adaptive parallelism |
+| `update_feeds(scheduled=True)` | 474 | Update all feeds with adaptive parallelism |
 | `update_feed(feed_url)` | 481 | Update a single feed |
 | `get_feeds()` | 490 | Yield all subscribed `Feed` instances |
 | `get_posts(feed)` | 499 | Yield all `Entry` instances for a feed |
@@ -131,15 +131,20 @@ to create modified copies when toggling read state.
 ### All feeds (line 474)
 
 ```python
-def update_feeds(self) -> None:
+def update_feeds(self, scheduled: bool = True) -> None:
     feed_count = len(list(self.reader.get_feeds()))
     workers = min(feed_count, (os.cpu_count() or 1) * 2)
-    self.reader.update_feeds(workers=workers)
+    self.reader.update_feeds(workers=workers, scheduled=scheduled)
 ```
 
 Adaptive parallelism: uses up to `2 × CPU cores` concurrent workers.
 The `reader` library handles HTTP fetching and feedparser parsing
 internally for each feed.
+
+When `scheduled=True` (default), the `reader` library's built-in
+update scheduling (60-minute interval) causes feeds updated recently
+to be silently skipped. Pass `scheduled=False` to force a full refresh
+of every subscribed feed.
 
 ### Single feed (line 481)
 
