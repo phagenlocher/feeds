@@ -1,6 +1,10 @@
 """Custom item delegate for two-line list items."""
 
+import typing
+
 from PySide6 import QtCore, QtGui, QtWidgets
+
+from feeds.ui.widgets import ItemType, ItemTypeRole
 
 
 class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
@@ -39,6 +43,70 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
             else QtGui.QColor("#888888")
         )
 
+        item_type: ItemType | None = index.data(ItemTypeRole)
+
+        match item_type:
+            case ItemType.FEED:
+                self._paint_inline(
+                    painter, option, font, title, subtitle, text_color, muted_color
+                )
+            case ItemType.ENTRY | None:
+                self._paint_two_line(
+                    painter, option, font, title, subtitle, text_color, muted_color
+                )
+            case _ as unreachable:
+                typing.assert_never(unreachable)
+
+        painter.restore()
+
+    @staticmethod
+    def _paint_inline(
+        painter: QtGui.QPainter,
+        option: QtWidgets.QStyleOptionViewItem,
+        font: QtGui.QFont,
+        title: str,
+        subtitle: str,
+        text_color: QtGui.QColor,
+        muted_color: QtGui.QColor,
+    ) -> None:
+        r = option.rect.adjusted(4, 0, -4, 0)
+
+        painter.setFont(font)
+        painter.setPen(text_color)
+        painter.drawText(
+            r,
+            QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter,
+            title,
+        )
+
+        if subtitle:
+            sep = " \u00b7 "
+            label = f"{sep}{subtitle}"
+            tw = painter.fontMetrics().horizontalAdvance(title)
+            sr = QtCore.QRect(
+                r.x() + tw,
+                r.y(),
+                r.width() - tw,
+                r.height(),
+            )
+            painter.setPen(muted_color)
+            painter.drawText(
+                sr,
+                QtCore.Qt.AlignmentFlag.AlignLeft
+                | QtCore.Qt.AlignmentFlag.AlignVCenter,
+                label,
+            )
+
+    @staticmethod
+    def _paint_two_line(
+        painter: QtGui.QPainter,
+        option: QtWidgets.QStyleOptionViewItem,
+        font: QtGui.QFont,
+        title: str,
+        subtitle: str,
+        text_color: QtGui.QColor,
+        muted_color: QtGui.QColor,
+    ) -> None:
         half = option.rect.height() // 2
         painter.setFont(font)
         painter.setPen(text_color)
@@ -59,8 +127,6 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
                 subtitle,
             )
 
-        painter.restore()
-
     def sizeHint(
         self,
         option: QtWidgets.QStyleOptionViewItem,
@@ -69,4 +135,11 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
         font: QtGui.QFont = index.data(QtCore.Qt.ItemDataRole.FontRole)
         if font is None:
             font = option.font
-        return QtCore.QSize(0, max(46, font.pointSize() * 4))
+        item_type: ItemType | None = index.data(ItemTypeRole)
+        match item_type:
+            case ItemType.FEED:
+                return QtCore.QSize(0, max(28, font.pointSize() * 2 + 4))
+            case ItemType.ENTRY | None:
+                return QtCore.QSize(0, max(46, font.pointSize() * 4))
+            case _ as unreachable:
+                typing.assert_never(unreachable)

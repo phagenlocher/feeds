@@ -6,9 +6,16 @@ built entirely programmatically — no `.ui` files or QSS stylesheets.
 ```
 FeedsApp (QMainWindow)                [feeds/app.py:18]
 ├── QToolBar: "Add Feed" | "Update Feeds"
-├── QSplitter (horizontal)
-│   ├── FeedsPane (left, 240px)       [feeds/ui/panes.py:32]
-│   └── EntriesPane (right, 560px)    [feeds/ui/panes.py:129]
+├── FeedTreePane                      [feeds/ui/panes.py:30]
+│   └── FeedTreeWidget (QTreeWidget)
+│       ├── Feed 1 (top-level, collapsible)
+│       │   ├── Entry 1 (child)
+│       │   ├── Entry 2 (child)
+│       │   └── …
+│       ├── Feed 2 (top-level, collapsible)
+│       │   ├── Entry 1 (child)
+│       │   └── …
+│       └── …
 └── StatusBar
 ```
 
@@ -31,13 +38,12 @@ instantiates `FeedsApp`, and enters the Qt event loop.
 
 - **Toolbar** (line 56): "Add Feed" button (triggers discovery flow)
   and "Update Feeds" button (triggers background update of all feeds).
-- **Splitter layout** (line 69): Horizontal `QSplitter` with
-  `FeedsPane` (240 px initial) on the left and `EntriesPane`
-  (560 px initial) on the right.
+- **FeedTreePane** (line 69): Single central widget containing a
+  `QTreeWidget` with feeds as top-level items and entries as children.
 - **Font zoom** (line 87): `Ctrl++`/`Ctrl+=` to zoom in, `Ctrl+-` to
-  zoom out, `Ctrl+0` to reset (base 12 pt). Adjusts both the
-  application-wide font and the item sizes in both panes.
-- **Busy state** (line 117): Disables the "Update" button during
+  zoom out, `Ctrl+0` to reset (base 12 pt). Adjusts font size in the
+  tree widget.
+- **Busy state** (line 113): Disables the "Update" button during
   background operations and shows "Updating…" text.
 - **Status bar**: Shows transient messages (errors, progress updates)
   that auto-clear after a configurable timeout.
@@ -46,114 +52,116 @@ instantiates `FeedsApp`, and enters the Qt event loop.
 
 | Signal | Handler | Description |
 |--------|---------|-------------|
-| `FeedsPane.feed_selected(int)` | `_on_feed_selected` (line 130) | Populates `EntriesPane` with entries for the chosen feed |
-| `FeedsPane.read_all_requested(int)` | `_read_all_async` (line 333) | Marks all entries in a feed as read |
-| `FeedsPane.remove_feed_requested(int)` | `_remove_feed_async` (line 310) | Unsubscribes and deletes a feed |
-| `FeedsPane.update_feed_requested(int)` | `_update_single_feed` (line 310) | Manually updates a single feed |
-| `EntriesPane.entry_activated(int)` | `_on_entry_activated` (line 159) | Marks entry read + opens URL in system browser |
-| `EntriesPane.entry_read_requested(int)` | `_on_entry_read` (line 163) | Marks a single entry as read |
-| `EntriesPane.entry_unread_requested(int)` | `_on_entry_unread` (line 167) | Marks a single entry as unread |
+| `FeedTreePane.entry_activated(Entry)` | `_on_entry_activated` (line 151) | Marks entry read + opens URL in system browser |
+| `FeedTreePane.entry_read_requested(Entry)` | `_on_entry_read` (line 155) | Marks a single entry as read |
+| `FeedTreePane.entry_unread_requested(Entry)` | `_on_entry_unread` (line 158) | Marks a single entry as unread |
+| `FeedTreePane.read_all_requested(int)` | `_read_all_async` (line 316) | Marks all entries in a feed as read |
+| `FeedTreePane.remove_feed_requested(int)` | `_remove_feed_async` (line 294) | Unsubscribes and deletes a feed |
+| `FeedTreePane.update_feed_requested(int)` | `_update_single_feed` (line 274) | Manually updates a single feed |
 
 ### Async flow
 
 All blocking operations (feed discovery, adding, updating, deletion,
-mark-all-read) are dispatched to `FeedService` (see below), which runs
-them on a background `QThread`. Callbacks update the UI on completion.
+mark-all-read) are dispatched to `FeedService`, which runs them on a
+background `QThread`. Callbacks rebuild the tree via `refresh(reader)`.
 
 ---
 
-## 3. Left Pane — `FeedsPane`
+## 3. Tree Pane — `FeedTreePane`
 
-**File:** `feeds/ui/panes.py:32`
+**File:** `feeds/ui/panes.py:30`
 
-Shows the list of subscribed feeds with unread counts. Uses a
-`FeedListWidget` with a `TwoLineRenderer` delegate.
+`FeedTreePane(QWidget)` replaces the old two-pane splitter. It
+contains a single `FeedTreeWidget(QTreeWidget)` where:
+
+- **Top-level items** = subscribed feeds
+- **Child items** = entries (posts) of that feed
+- Feeds are **collapsed by default**; click the arrow to expand.
 
 ### Signals
 
 | Signal | Type | Emitted when |
 |--------|------|-------------|
-| `feed_selected` | `int` (row index) | User clicks a feed |
-| `read_all_requested` | `int` (row index) | "Mark all as read" context menu |
-| `remove_feed_requested` | `int` (row index) | "Remove feed" context menu |
-| `update_feed_requested` | `int` (row index) | "Update feed" context menu |
+| `entry_activated` | `Entry` | User double-clicks an entry |
+| `entry_read_requested` | `Entry` | "Mark Read" context menu |
+| `entry_unread_requested` | `Entry` | "Mark Unread" context menu |
+| `read_all_requested` | `int` (feed row) | "Mark all as read" context menu |
+| `remove_feed_requested` | `int` (feed row) | "Remove feed" context menu |
+| `update_feed_requested` | `int` (feed row) | "Update feed" context menu |
 
-### Display
+### Display — feed items
 
-Each item shows:
+Each feed item shows:
 - **Title** — feed title with unread count: `"Feed Name (3)"`
 - **Subtitle** — last-updated date (`"2025-12-01"`)
 - **Bold** — indicates unread entries exist
 
-### Context menu (line 87)
+### Display — entry items
 
-Right-click on a feed:
-
-| Action | Behavior |
-|--------|----------|
-| Mark all as read | Emits `read_all_requested` |
-| Remove feed | Shows confirmation `QMessageBox`, then emits `remove_feed_requested` |
-| Copy URL | Copies feed URL to system clipboard |
-| Update feed | Emits `update_feed_requested` to trigger a single-feed background update |
-
-Uses `match`/`case` with `typing.assert_never` for exhaustive dispatch
-on the `FeedMenuAction` enum.
-
----
-
-## 4. Right Pane — `EntriesPane`
-
-**File:** `feeds/ui/panes.py:129`
-
-Shows the entries (articles) for the currently selected feed.
-
-### Signals
-
-| Signal | Type | Emitted when |
-|--------|------|-------------|
-| `entry_activated` | `int` (row index) | User double-clicks an entry |
-| `entry_read_requested` | `int` (row index) | "Mark Read" context menu |
-| `entry_unread_requested` | `int` (row index) | "Mark Unread" context menu |
-
-### Display
-
-Each item shows:
+Each entry item shows:
 - **Title** — entry headline
 - **Subtitle** — `"Author · 2025-12-01"` (author and date, joined by ·)
 - **Bold** — indicates the entry is unread
 
-### Interaction
+### Context menu — feed (right-click)
 
-- **Double-click**: Marks the entry as read and opens its URL in the
-  system browser via `webbrowser.open()`.
-- **Context menu** (line 197): Toggle "Mark Read" / "Mark Unread"
-  depending on current state.
+| Action | Behavior |
+|--------|----------|
+| Mark all as read | Emits `read_all_requested(feed_index)` |
+| Remove feed | Shows confirmation `QMessageBox`, then emits `remove_feed_requested(feed_index)` |
+| Copy URL | Copies feed URL to system clipboard |
+| Update feed | Emits `update_feed_requested(feed_index)` |
+
+### Context menu — entry (right-click)
+
+| Action | Behavior |
+|--------|----------|
+| Mark Read / Mark Unread | Toggles label based on current state; updates visual immediately, emits `entry_read_requested(Entry)` / `entry_unread_requested(Entry)` |
+
+### Visual updates
+
+The pane handles entry-level visual updates directly (no signal round-trip):
+
+- `mark_entry_read(item)` — removes bold from entry, decrements parent feed unread count
+- `mark_entry_unread(item)` — adds bold to entry, increments parent feed unread count
+
+Bulk operations (update all, mark all as read, remove) trigger a full
+`refresh(reader)` which rebuilds the entire tree from the database.
 
 ---
 
-## 5. Shared Widget — `FeedListWidget`
+## 4. Tree Widget — `FeedTreeWidget`
 
-**File:** `feeds/ui/widgets.py:6`
+**File:** `feeds/ui/widgets.py:11`
 
-A `QListWidget` subclass used by both panes. Adds:
+A `QTreeWidget` subclass used by `FeedTreePane`. Features:
 
 - **Hand cursor** — changes to `PointingHandCursor` when hovering over
-  items (via `eventFilter` on the viewport, line 50).
+  items (via `eventFilter` on the viewport).
 - **Font scaling** — `set_font_size()` recalculates item heights and
-  reapplies fonts (line 19).
+  reapplies fonts recursively through the tree hierarchy.
 - **Item builder** — `build_item(title, subtitle, bold)` creates a
-  `QListWidgetItem` with the subtitle stored in `UserRole` data
-  (line 40).
+  `QTreeWidgetItem` with the subtitle stored in `UserRole` data.
+- **Animations** — `setAnimated(True)` for smooth expand/collapse.
+- **Hidden header** — no column headers displayed.
 - **Selection styling** — blue background / white text via inline
-  stylesheet (line 13).
+  stylesheet.
+
+### Custom data roles (widgets.py)
+
+| Role | Value | Used on |
+|------|-------|---------|
+| `ItemTypeRole` (User+1) | `"feed"` / `"entry"` | All items |
+| `FeedIndexRole` (User+2) | `int` (index in `pane.feeds`) | All items |
+| `DataRole` (User+3) | `Feed` / `Entry` | All items |
 
 ---
 
-## 6. Item Delegate — `TwoLineRenderer`
+## 5. Item Delegate — `TwoLineRenderer`
 
 **File:** `feeds/ui/delegates.py:6`
 
-A `QStyledItemDelegate` that paints each list item in two lines:
+A `QStyledItemDelegate` that paints each tree item in two lines:
 
 ```
 Title (bold if unread, or normal weight)   ← top half
@@ -161,20 +169,19 @@ Subtitle (gray #888888, smaller font)      ← bottom half
 ```
 
 - **Selected state**: Uses palette highlight colors for both title and
-  subtitle (line 30-39).
-- **Height**: `max(46, font.pointSize() * 4)` — scales with font size
-  (line 64).
+  subtitle.
+- **Height**: `max(46, font.pointSize() * 4)` — scales with font size.
 
 ---
 
-## 7. Dialogs
+## 6. Dialogs
 
 ### `AddFeedDialog` — `feeds/ui/dialogs.py:11`
 
 Simple dialog with a URL input field:
 
-- **Validation** (line 37): Enables the "Add" button only when
-  `urlparse` returns both a `scheme` and `netloc`.
+- **Validation**: Enables the "Add" button only when `urlparse`
+  returns both a `scheme` and `netloc`.
 - **Enter key** submits, Escape cancels.
 
 ### `AddFeedChoiceDialog` — `feeds/ui/dialogs.py:46`
@@ -187,7 +194,7 @@ Shown when multiple feeds are discovered from a single URL:
 
 ---
 
-## 8. Background Threading
+## 7. Background Threading
 
 ### `FeedService` — `feeds/services/feed_service.py:21`
 
@@ -195,9 +202,9 @@ Orchestrates async feed operations. Maintains a single `WorkerThread`
 and a FIFO queue of pending operations.
 
 - `run(fn, name, on_done, on_error)` — enqueues or starts immediately
-  if no worker is active (line 37).
+  if no worker is active.
 - Sequential execution: each operation must finish before the next
-  starts (`_process_queue`, line 85).
+  starts (`_process_queue`).
 - High-level wrappers: `add_feed`, `discover_feeds`, `update_feed`,
   `update_feeds`, `delete_feed`, `mark_all_as_read`.
 
@@ -211,7 +218,7 @@ Minimal `QThread` subclass:
 
 ---
 
-## 9. Feed Addition Flow
+## 8. Feed Addition Flow
 
 1. User clicks "Add Feed" → `AddFeedDialog` opens.
 2. URL entered → `FeedService.discover_feeds()` runs in background.
@@ -219,18 +226,20 @@ Minimal `QThread` subclass:
    - **0 feeds**: Error message in status bar.
    - **1 feed**: Added and updated immediately.
    - **Multiple**: `AddFeedChoiceDialog` for selection.
-4. Chain: `discover` → `add_feed` → `update_feed` → select in pane.
+4. Chain: `discover` → `add_feed` → `update_feed` → refresh tree
+   → expand the newly added feed.
 5. For multiple feeds, they are added sequentially with progress
-   updates in the status bar (`_add_feeds_sequentially`, line 234).
+   updates in the status bar (`_add_feeds_sequentially`).
 
 ---
 
-## 10. Entry activation
+## 9. Entry activation
 
-When a feed entry is activated (double-clicked):
+When a tree entry is activated (double-clicked):
 
-1. The entry is marked as read in the database.
-2. The entry's URL is opened in the system default browser via
+1. `FeedTreePane` updates the visual immediately (removes bold,
+   decrements parent feed unread count).
+2. Emits `entry_activated(Entry)` signal.
+3. `FeedsApp` marks the entry as read in the database.
+4. The entry's URL is opened in the system default browser via
    `webbrowser.open()`.
-3. The feed's unread count is recalculated and the feed list item
-   font is updated (bold removed if no unread remaining).

@@ -131,7 +131,12 @@ class FeedService:
         on_error: Callable[[str], object] | None = None,
     ) -> None:
         log.info("updating all feeds")
-        self.run(lambda: self._reader.update_feeds(scheduled=False), "update_feeds", on_done, on_error)
+        self.run(
+            lambda: self._reader.update_feeds(scheduled=False),
+            "update_feeds",
+            on_done,
+            on_error,
+        )
 
     def delete_feed(
         self,
