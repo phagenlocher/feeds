@@ -2,6 +2,7 @@
 
 import logging
 import webbrowser
+from dataclasses import dataclass
 from enum import IntEnum, auto
 from typing import assert_never
 
@@ -17,6 +18,16 @@ from feeds.ui.widgets import (
 )
 
 log: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class TreeViewState:
+    """Snapshot of expanded/selection/scroll state to preserve across tree rebuilds."""
+
+    expanded_feed_urls: frozenset[str]
+    selected_feed_url: str | None
+    selected_entry_id: str | None
+    scroll_position: int
 
 
 def _feed_label(feed: Feed, unread_count: int) -> str:
@@ -80,13 +91,113 @@ class FeedTreePane(QtWidgets.QWidget):
                 self.tree.expandItem(feed_item)
                 break
 
+    def _get_expanded_feed_urls(self) -> frozenset[str]:
+        expanded_urls: list[str] = []
+        for i in range(self.tree.topLevelItemCount()):
+            item: QtWidgets.QTreeWidgetItem | None = self.tree.topLevelItem(i)
+            if item is None:
+                continue
+            if item.isExpanded():
+                feed: Feed | None = item.data(0, DataRole)
+                if feed is not None:
+                    expanded_urls.append(feed.id)
+
+        return frozenset(expanded_urls)
+
+    def _save_state(self) -> TreeViewState:
+        selected_feed_url: str | None = None
+        selected_entry_id: str | None = None
+        selected_items: list[QtWidgets.QTreeWidgetItem] = self.tree.selectedItems()
+        if selected_items:
+            sel: QtWidgets.QTreeWidgetItem = selected_items[0]
+            item_type: ItemType | None = sel.data(0, ItemTypeRole)
+            match item_type:
+                case ItemType.FEED:
+                    sel_feed: Feed | None = sel.data(0, DataRole)
+                    if sel_feed is not None:
+                        selected_feed_url = sel_feed.id
+                case ItemType.ENTRY:
+                    sel_entry: Entry | None = sel.data(0, DataRole)
+                    parent: QtWidgets.QTreeWidgetItem | None = sel.parent()
+                    if sel_entry is not None and parent is not None:
+                        parent_feed: Feed | None = parent.data(0, DataRole)
+                        if parent_feed is not None:
+                            selected_feed_url = parent_feed.id
+                            selected_entry_id = sel_entry.entry_id
+                case _:
+                    log.warning(f"Unknown item type: {item_type}")
+
+        scroll_pos: int = self.tree.verticalScrollBar().value()
+
+        return TreeViewState(
+            expanded_feed_urls=self._get_expanded_feed_urls(),
+            selected_feed_url=selected_feed_url,
+            selected_entry_id=selected_entry_id,
+            scroll_position=scroll_pos,
+        )
+
+    def _restore_state(self, state: TreeViewState) -> None:
+        for i in range(self.tree.topLevelItemCount()):
+            item: QtWidgets.QTreeWidgetItem | None = self.tree.topLevelItem(i)
+            if item is None:
+                continue
+            exp_feed: Feed | None = item.data(0, DataRole)
+            if exp_feed is not None and exp_feed.id in state.expanded_feed_urls:
+                item.setExpanded(True)
+
+        sel_target: QtWidgets.QTreeWidgetItem | None = None
+        if state.selected_feed_url is not None:
+            for i in range(self.tree.topLevelItemCount()):
+                feed_item: QtWidgets.QTreeWidgetItem | None = self.tree.topLevelItem(i)
+                if feed_item is None:
+                    continue
+                feed: Feed | None = feed_item.data(0, DataRole)
+                if feed is None or feed.id != state.selected_feed_url:
+                    continue
+
+                if state.selected_entry_id is None:
+                    feed_item.setSelected(True)
+                    self.tree.setCurrentItem(feed_item)
+                    sel_target = feed_item
+                else:
+                    for j in range(feed_item.childCount()):
+                        child: QtWidgets.QTreeWidgetItem | None = feed_item.child(j)
+                        if child is None:
+                            continue
+                        entry: Entry | None = child.data(0, DataRole)
+                        if (
+                            entry is not None
+                            and entry.entry_id == state.selected_entry_id
+                        ):
+                            child.setSelected(True)
+                            self.tree.setCurrentItem(child)
+                            sel_target = child
+                            break
+                break
+
+        QtCore.QTimer.singleShot(0, lambda: self._finish_restore(state, sel_target))
+
+    def _finish_restore(
+        self,
+        state: TreeViewState,
+        sel_target: QtWidgets.QTreeWidgetItem | None,
+    ) -> None:
+        self.tree.verticalScrollBar().setValue(state.scroll_position)
+        if sel_target is not None:
+            self.tree.scrollToItem(
+                sel_target,
+                QtWidgets.QAbstractItemView.ScrollHint.EnsureVisible,
+            )
+
     def refresh(self, reader: FeedReader) -> None:
         """Clear and rebuild the tree from all feeds and entries."""
+        prev_state: TreeViewState = self._save_state()
         self.feeds = list(reader.get_feeds())
         self.tree.clear()
         for feed_idx, feed in enumerate(self.feeds):
             feed_item = self._build_feed_item(feed, feed_idx, reader)
             self.tree.addTopLevelItem(feed_item)
+        self._restore_state(prev_state)
 
     def mark_entry_read(self, item: QtWidgets.QTreeWidgetItem) -> None:
         """Remove bold from the item and decrement the parent feed's unread count."""

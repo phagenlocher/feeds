@@ -6,6 +6,8 @@ from typing import assert_never
 from PySide6 import QtCore, QtGui, QtWidgets
 
 ItemTypeRole: int = QtCore.Qt.ItemDataRole.UserRole + 1
+FeedIndexRole: int = QtCore.Qt.ItemDataRole.UserRole + 2
+DataRole: int = QtCore.Qt.ItemDataRole.UserRole + 3
 
 
 class ItemType(IntEnum):
@@ -13,10 +15,6 @@ class ItemType(IntEnum):
 
     FEED = auto()
     ENTRY = auto()
-
-
-FeedIndexRole: int = QtCore.Qt.ItemDataRole.UserRole + 2
-DataRole: int = QtCore.Qt.ItemDataRole.UserRole + 3
 
 
 class FeedTreeWidget(QtWidgets.QTreeWidget):
