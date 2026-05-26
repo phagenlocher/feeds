@@ -6,10 +6,9 @@
 
 ## Commands
 - `just run` — run the app
-- `just build` — build PyInstaller binary (output: dist/main)
-- `just format` — ruff format feeds/
-- `just lint` — run basedpyright
-- `uv run ruff check feeds/` — ruff lint
+- `just build` — build binary (output: dist/main)
+- `just format` — run formatting
+- `just lint` — run linting
 
 ## Conventions
 - Python ≥3.10, PySide6, reader lib

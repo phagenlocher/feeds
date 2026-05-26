@@ -22,10 +22,10 @@ install: build
     cp dist/feeds ~/.local/bin/
 
 format:
-    uv run ruff format feeds/
+    uv run ruff format
 
 lint:
-    uv run basedpyright .
+    uv run ruff check
 
 run *args:
     uv run python -m feeds {{args}}
