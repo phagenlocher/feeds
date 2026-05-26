@@ -1,6 +1,6 @@
 """Custom item delegate for two-line list items."""
 
-import typing
+from typing import assert_never
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -16,6 +16,7 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
         option: QtWidgets.QStyleOptionViewItem,
         index: QtCore.QModelIndex | QtCore.QPersistentModelIndex,
     ) -> None:
+        """Draw selection highlight, then render inline or two-line layout."""
         painter.save()
 
         if option.state & QtWidgets.QStyle.StateFlag.State_Selected:
@@ -55,7 +56,7 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
                     painter, option, font, title, subtitle, text_color, muted_color
                 )
             case _ as unreachable:
-                typing.assert_never(unreachable)
+                assert_never(unreachable)
 
         painter.restore()
 
@@ -127,11 +128,12 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
                 subtitle,
             )
 
-    def sizeHint(
+    def sizeHint(  # noqa: N802
         self,
         option: QtWidgets.QStyleOptionViewItem,
         index: QtCore.QModelIndex | QtCore.QPersistentModelIndex,
     ) -> QtCore.QSize:
+        """Return QSize with height based on font size and item type (feed vs entry)."""
         font: QtGui.QFont = index.data(QtCore.Qt.ItemDataRole.FontRole)
         if font is None:
             font = option.font
@@ -142,4 +144,4 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
             case ItemType.ENTRY | None:
                 return QtCore.QSize(0, max(46, font.pointSize() * 4))
             case _ as unreachable:
-                typing.assert_never(unreachable)
+                assert_never(unreachable)

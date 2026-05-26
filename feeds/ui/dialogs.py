@@ -12,6 +12,7 @@ class AddFeedDialog(QtWidgets.QDialog):
     """Dialog for entering a feed URL with basic validation."""
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Modal dialog with a URL field and an Add button with validation."""
         super().__init__(parent)
         self.setWindowTitle("Add Feed")
         self.setFixedSize(400, 120)
@@ -40,6 +41,7 @@ class AddFeedDialog(QtWidgets.QDialog):
 
     @property
     def url(self) -> str:
+        """The trimmed URL text currently in the input field."""
         return self.url_input.text().strip()
 
 
@@ -51,6 +53,7 @@ class AddFeedChoiceDialog(QtWidgets.QDialog):
         feeds: list[tuple[str, str]],
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
+        """Modal dialog listing discovered feeds for multi-selection."""
         super().__init__(parent)
         self.setWindowTitle("Choose feeds")
         self.setMinimumSize(480, 300)
@@ -90,6 +93,7 @@ class AddFeedChoiceDialog(QtWidgets.QDialog):
 
     @property
     def selected_feeds(self) -> list[tuple[str, str]]:
+        """(url, title) tuples for every feed the user highlighted in the list."""
         return [
             (item.data(QtWidgets.QListWidgetItem.ItemType.UserType))
             for item in self._list.selectedItems()

@@ -1,15 +1,17 @@
 """Patch vendored feedparser for Nuitka compatibility.
+
 Removes __code__ assignments (not writable in Nuitka) and replaces
 the goahead/parse_starttag overrides with parent-class fallbacks.
 """
-import sys
 
 import importlib
+import logging
+import sys
 
 mod = importlib.import_module("reader._vendor.feedparser.html")
 path = mod.__file__
 if not path or not path.endswith(".py"):
-    print(f"no .py file found: {path}", file=sys.stderr)
+    logging.error("no .py file found: %s", path)
     sys.exit(1)
 
 with open(path) as f:
@@ -52,6 +54,10 @@ with open(path, "w") as f:
     _ = f.write(src)
 
 assert "goahead.__code__" not in src, "patch failed: __code__ still in file"
-assert "__parse_starttag.__code__" not in src, "patch failed: __parse_starttag still in file"
-assert "self.__parse_starttag" not in src, "patch failed: __parse_starttag call still in file"
-print(f"patched {path}")
+assert "__parse_starttag.__code__" not in src, (
+    "patch failed: __parse_starttag still in file"
+)
+assert "self.__parse_starttag" not in src, (
+    "patch failed: __parse_starttag call still in file"
+)
+logging.info("patched %s", path)

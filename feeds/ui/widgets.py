@@ -1,7 +1,7 @@
 """Reusable tree widget with hand cursor and font management."""
 
-import typing
 from enum import IntEnum, auto
+from typing import assert_never
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -9,6 +9,8 @@ ItemTypeRole: int = QtCore.Qt.ItemDataRole.UserRole + 1
 
 
 class ItemType(IntEnum):
+    """Item types in the tree widget."""
+
     FEED = auto()
     ENTRY = auto()
 
@@ -21,6 +23,7 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
     """Tree widget with hand cursor on items and font-scaling support."""
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Build tree widget with hand cursor and font management."""
         super().__init__(parent)
         self._font_size: int = 0
         self.setHeaderHidden(True)
@@ -39,9 +42,10 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
             case ItemType.ENTRY | None:
                 return max(46, size * 4)
             case _ as unreachable:
-                typing.assert_never(unreachable)
+                assert_never(unreachable)
 
     def set_font_size(self, size: int) -> None:
+        """Set font size and reapply with bold and height to all items."""
         self._font_size = size
 
         def _visit(item: QtWidgets.QTreeWidgetItem) -> None:
@@ -68,6 +72,7 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
         return font
 
     def apply_font(self, item: QtWidgets.QTreeWidgetItem, bold: bool) -> None:
+        """Set the item's font to the configured size and the given bold state."""
         item.setFont(0, self._make_font(self._font_size, bold))
 
     def build_item(
@@ -77,6 +82,7 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
         bold: bool,
         item_type: ItemType | None = None,
     ) -> QtWidgets.QTreeWidgetItem:
+        """Build QTreeWidgetItem with title, subtitle, bold, and size hint."""
         size = self._font_size if self._font_size > 0 else 12
         item = QtWidgets.QTreeWidgetItem()
         item.setText(0, title)
@@ -85,7 +91,8 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
         self.apply_font(item, bold)
         return item
 
-    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:  # noqa: N802
+        """Set PointingHandCursor over items, ArrowCursor over empty space."""
         if (
             event.type() == QtCore.QEvent.Type.MouseMove
             and isinstance(event, QtGui.QMouseEvent)

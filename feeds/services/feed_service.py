@@ -26,12 +26,14 @@ class FeedService:
     """
 
     def __init__(self, reader: FeedReader) -> None:
+        """Store the reader reference; no worker running, no queued operations."""
         self._reader: FeedReader = reader
         self._worker: WorkerThread | None = None
         self._queue: list[_PendingOp] = []
 
     @property
     def is_busy(self) -> bool:
+        """True when a worker thread is actively processing an operation."""
         return self._worker is not None
 
     def run(
@@ -93,6 +95,7 @@ class FeedService:
         on_done: Callable[[], object] | None = None,
         on_error: Callable[[str], object] | None = None,
     ) -> None:
+        """Enqueue reader.add_feed(url) on a background worker thread."""
         log.info("adding feed %s", url)
         self.run(lambda: self._reader.add_feed(url), "add_feed", on_done, on_error)
 
@@ -102,6 +105,7 @@ class FeedService:
         on_done: Callable[[list[tuple[str, str]]], object] | None = None,
         on_error: Callable[[str], object] | None = None,
     ) -> None:
+        """Probe a URL for discoverable feeds on a worker; forward to on_done."""
         log.info("discovering feeds from %s", url)
         result: list[list[tuple[str, str]]] = []
 
@@ -120,6 +124,7 @@ class FeedService:
         on_done: Callable[[], object] | None = None,
         on_error: Callable[[str], object] | None = None,
     ) -> None:
+        """Enqueue reader.update_feed(url) on a background worker thread."""
         log.info("updating feed %s", url)
         self.run(
             lambda: self._reader.update_feed(url), "update_feed", on_done, on_error
@@ -130,6 +135,7 @@ class FeedService:
         on_done: Callable[[], object] | None = None,
         on_error: Callable[[str], object] | None = None,
     ) -> None:
+        """Enqueue reader.update_feeds(scheduled=False) on a background thread."""
         log.info("updating all feeds")
         self.run(
             lambda: self._reader.update_feeds(scheduled=False),
@@ -144,6 +150,7 @@ class FeedService:
         on_done: Callable[[], object] | None = None,
         on_error: Callable[[str], object] | None = None,
     ) -> None:
+        """Enqueue reader.delete_feed(feed) on a background worker thread."""
         log.info("deleting feed %s", feed.id)
         self.run(
             lambda: self._reader.delete_feed(feed), "delete_feed", on_done, on_error
@@ -155,6 +162,7 @@ class FeedService:
         on_done: Callable[[], object] | None = None,
         on_error: Callable[[str], object] | None = None,
     ) -> None:
+        """Enqueue reader.mark_all_as_read(feed) on a background worker thread."""
         log.info("marking all as read in feed %s", feed.id)
         self.run(
             lambda: self._reader.mark_all_as_read(feed),

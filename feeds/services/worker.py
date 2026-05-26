@@ -15,11 +15,13 @@ class WorkerThread(QtCore.QThread):
     error: QtCore.Signal = QtCore.Signal(str)
 
     def __init__(self, fn: Callable[[], object], name: str | None = None) -> None:
+        """Store callable and derive name from fn.__name__ if not supplied."""
         super().__init__()
         self._fn: Callable[[], object] = fn
         self._name: str = name or fn.__name__
 
     def run(self) -> None:
+        """Run callable, emit done or error with exception text on failure."""
         log.info("starting worker %s", self._name)
         try:
             self._fn()

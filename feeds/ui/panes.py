@@ -1,9 +1,9 @@
 """Single tree pane with feeds as top-level and entries as children."""
 
 import logging
-import typing
 import webbrowser
 from enum import IntEnum, auto
+from typing import assert_never
 
 from PySide6 import QtCore, QtWidgets
 
@@ -24,6 +24,8 @@ def _feed_label(feed: Feed, unread_count: int) -> str:
 
 
 class FeedMenuAction(IntEnum):
+    """Actions available on the feed context menu."""
+
     COPY_URL = auto()
     READ_ALL = auto()
     REMOVE = auto()
@@ -31,6 +33,8 @@ class FeedMenuAction(IntEnum):
 
 
 class EntryMenuAction(IntEnum):
+    """Actions available on the entry context menu."""
+
     MARK_READ = auto()
     MARK_UNREAD = auto()
 
@@ -50,6 +54,7 @@ class FeedTreePane(QtWidgets.QWidget):
         delegate: QtWidgets.QStyledItemDelegate,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
+        """Build the pane with a tree widget using the given delegate."""
         super().__init__(parent)
         self.feeds: list[Feed] = []
         self.tree: FeedTreeWidget
@@ -65,6 +70,7 @@ class FeedTreePane(QtWidgets.QWidget):
         layout.addWidget(self.tree)
 
     def expand_feed_by_url(self, url: str) -> None:
+        """Expand the feed node matching the given URL."""
         for i in range(self.tree.topLevelItemCount()):
             feed_item: QtWidgets.QTreeWidgetItem | None = self.tree.topLevelItem(i)
             if feed_item is None:
@@ -75,6 +81,7 @@ class FeedTreePane(QtWidgets.QWidget):
                 break
 
     def refresh(self, reader: FeedReader) -> None:
+        """Clear and rebuild the tree from all feeds and entries."""
         self.feeds = list(reader.get_feeds())
         self.tree.clear()
         for feed_idx, feed in enumerate(self.feeds):
@@ -82,10 +89,12 @@ class FeedTreePane(QtWidgets.QWidget):
             self.tree.addTopLevelItem(feed_item)
 
     def mark_entry_read(self, item: QtWidgets.QTreeWidgetItem) -> None:
+        """Remove bold from the item and decrement the parent feed's unread count."""
         self._set_item_bold(item, False)
         self._update_parent_unread(item.parent(), -1)
 
     def mark_entry_unread(self, item: QtWidgets.QTreeWidgetItem) -> None:
+        """Apply bold to the item and increment the parent feed's unread count."""
         self._set_item_bold(item, True)
         self._update_parent_unread(item.parent(), 1)
 
@@ -168,7 +177,7 @@ class FeedTreePane(QtWidgets.QWidget):
             case ItemType.FEED | None:
                 pass
             case _ as unreachable:
-                typing.assert_never(unreachable)
+                assert_never(unreachable)
 
     def _on_context_menu(self, pos: QtCore.QPoint) -> None:
         item: QtWidgets.QTreeWidgetItem | None = self.tree.itemAt(pos)
@@ -183,7 +192,7 @@ class FeedTreePane(QtWidgets.QWidget):
             case None:
                 pass
             case _ as unreachable:
-                typing.assert_never(unreachable)
+                assert_never(unreachable)
 
     def _show_feed_context_menu(
         self, item: QtWidgets.QTreeWidgetItem, pos: QtCore.QPoint
@@ -232,7 +241,7 @@ class FeedTreePane(QtWidgets.QWidget):
                 log.info("update feed requested: %s", feed.id)
                 self.update_feed_requested.emit(feed_index)
             case _ as unreachable:
-                typing.assert_never(unreachable)
+                assert_never(unreachable)
 
     def _show_entry_context_menu(
         self, item: QtWidgets.QTreeWidgetItem, pos: QtCore.QPoint
@@ -262,4 +271,4 @@ class FeedTreePane(QtWidgets.QWidget):
                 self.mark_entry_unread(item)
                 self.entry_unread_requested.emit(entry)
             case _ as unreachable:
-                typing.assert_never(unreachable)
+                assert_never(unreachable)

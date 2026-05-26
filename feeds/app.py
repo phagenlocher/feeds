@@ -19,6 +19,7 @@ class FeedsApp(QtWidgets.QMainWindow):
     """Main window orchestrating toolbar, tree pane, zoom, and async operations."""
 
     def __init__(self, reader: FeedReader | None = None) -> None:
+        """Set up toolbar, pane, font, zoom, reader, service and load feeds."""
         super().__init__()
         self.reader: FeedReader | None = None
         self._service: FeedService | None = None

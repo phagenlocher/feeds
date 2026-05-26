@@ -1,4 +1,4 @@
-"""Entry point: python -m feeds"""
+"""Application entry point invoked via python -m feeds."""
 
 import argparse
 import logging
@@ -10,6 +10,7 @@ from feeds.app import FeedsApp
 
 
 def main() -> None:
+    """Parse CLI arguments, configure logging, and launch the FeedsApp main window."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable debug logging"
