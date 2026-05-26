@@ -62,9 +62,6 @@ extend-select = [
     "RUF",
 ]
 
-[tool.ruff.lint.per-file-ignores]
-"feeds/*" = ["D", "N802"]
-
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
