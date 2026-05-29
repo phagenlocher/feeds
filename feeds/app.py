@@ -51,6 +51,7 @@ class FeedsApp(QtWidgets.QMainWindow):
                 log.exception("failed to load feeds")
                 traceback.print_exc()
                 self.statusBar().showMessage("Failed to load feeds from database", 0)
+            self._update_all_feeds(scheduled=True)
 
     def _build_toolbar(self) -> None:
         toolbar = QtWidgets.QToolBar()
@@ -246,16 +247,22 @@ class FeedsApp(QtWidgets.QMainWindow):
             self._set_busy(False)
             self.statusBar().showMessage("Feed added", 3000)
 
-    def _on_update_feeds(self) -> None:
+    def _update_all_feeds(self, scheduled: bool = False) -> None:
+        """Update all feeds with status and busy feedback."""
         if self._service is None:
             return
-        log.info("update feeds button clicked")
+        log.info("updating all feeds (scheduled=%s)", scheduled)
         self.statusBar().showMessage("Updating feeds\u2026")
         self._set_busy(True)
         self._service.update_feeds(
+            scheduled=scheduled,
             on_done=self._on_update_feeds_done,
             on_error=self._on_service_error,
         )
+
+    def _on_update_feeds(self) -> None:
+        """Toolbar button handler — force-refresh all feeds."""
+        self._update_all_feeds(scheduled=False)
 
     def _on_update_feeds_done(self) -> None:
         if self.reader is None:

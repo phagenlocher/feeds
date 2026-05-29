@@ -132,13 +132,14 @@ class FeedService:
 
     def update_feeds(
         self,
+        scheduled: bool = False,
         on_done: Callable[[], object] | None = None,
         on_error: Callable[[str], object] | None = None,
     ) -> None:
-        """Enqueue reader.update_feeds(scheduled=False) on a background thread."""
+        """Enqueue reader.update_feeds(scheduled) on a background thread."""
         log.info("updating all feeds")
         self.run(
-            lambda: self._reader.update_feeds(scheduled=False),
+            lambda: self._reader.update_feeds(scheduled=scheduled),
             "update_feeds",
             on_done,
             on_error,
