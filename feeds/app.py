@@ -1,4 +1,4 @@
-"""Main window orchestrating toolbar, tree pane, zoom, and async operations."""
+"""Main window orchestrating menu bar, tree pane, zoom, and async operations."""
 
 import logging
 import traceback
@@ -16,10 +16,10 @@ log: logging.Logger = logging.getLogger(__name__)
 
 
 class FeedsApp(QtWidgets.QMainWindow):
-    """Main window orchestrating toolbar, tree pane, zoom, and async operations."""
+    """Main window orchestrating menu bar, tree pane, zoom, and async operations."""
 
     def __init__(self, reader: FeedReader | None = None) -> None:
-        """Set up toolbar, pane, font, zoom, reader, service and load feeds."""
+        """Set up menu bar, pane, font, zoom, reader, service and load feeds."""
         super().__init__()
         self.reader: FeedReader | None = None
         self._service: FeedService | None = None
@@ -32,7 +32,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self.statusBar().showMessage("")
 
         delegate = TwoLineRenderer(self)
-        self._build_toolbar()
+        self._build_menu_bar()
         self._build_main_area(delegate)
 
         try:
@@ -53,18 +53,17 @@ class FeedsApp(QtWidgets.QMainWindow):
                 self.statusBar().showMessage("Failed to load feeds from database", 0)
             self._update_all_feeds(scheduled=True)
 
-    def _build_toolbar(self) -> None:
-        toolbar = QtWidgets.QToolBar()
-        toolbar.setMovable(False)
-        self.addToolBar(toolbar)
+    def _build_menu_bar(self) -> None:
+        menubar = self.menuBar()
+        feed_menu = menubar.addMenu("&Feed")
 
-        add_action = QtGui.QAction("Add Feed", self)
+        add_action = QtGui.QAction("&Add Feed", self)
         add_action.triggered.connect(self._on_add_feed)
-        toolbar.addAction(add_action)
+        feed_menu.addAction(add_action)
 
-        self._update_action = QtGui.QAction("Update Feeds", self)
+        self._update_action = QtGui.QAction("&Update Feeds", self)
         self._update_action.triggered.connect(self._on_update_feeds)
-        toolbar.addAction(self._update_action)
+        feed_menu.addAction(self._update_action)
 
     def _build_main_area(self, delegate: TwoLineRenderer) -> None:
         self.pane = FeedTreePane(delegate, self)

@@ -5,7 +5,7 @@ built entirely programmatically — no `.ui` files or QSS stylesheets.
 
 ```
 FeedsApp (QMainWindow)                [feeds/app.py:18]
-├── QToolBar: "Add Feed" | "Update Feeds"
+├── Menu Bar: "Feed" menu with "Add Feed" | "Update Feeds"
 ├── FeedTreePane                      [feeds/ui/panes.py:30]
 │   └── FeedTreeWidget (QTreeWidget)
 │       ├── Feed 1 (top-level, collapsible)
@@ -36,14 +36,11 @@ instantiates `FeedsApp`, and enters the Qt event loop.
 
 `FeedsApp(QMainWindow)` is the application window. Responsibilities:
 
-- **Toolbar** (line 56): "Add Feed" button (triggers discovery flow)
-  and "Update Feeds" button (triggers background update of all feeds).
+- **Menu bar** (line 56): "Feed" menu with "Add Feed" action (triggers
+  discovery flow) and "Update Feeds" action (triggers background update
+  of all feeds).
 - **FeedTreePane** (line 69): Single central widget containing a
-  `QTreeWidget` with feeds as top-level items and entries as children.
-- **Font zoom** (line 87): `Ctrl++`/`Ctrl+=` to zoom in, `Ctrl+-` to
-  zoom out, `Ctrl+0` to reset (base 12 pt). Adjusts font size in the
-  tree widget.
-- **Busy state** (line 113): Disables the "Update" button during
+- **Busy state** (line 113): Disables the "Update" menu action during
   background operations and shows "Updating…" text.
 - **Status bar**: Shows transient messages (errors, progress updates)
   that auto-clear after a configurable timeout.
