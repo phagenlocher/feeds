@@ -2,6 +2,7 @@
 
 import logging
 import traceback
+import webbrowser
 from collections.abc import Callable
 
 from PySide6 import QtGui, QtWidgets
@@ -9,7 +10,7 @@ from PySide6 import QtGui, QtWidgets
 from feeds.models.feed import Entry, FeedReader
 from feeds.services.feed_service import FeedService
 from feeds.ui.delegates import TwoLineRenderer
-from feeds.ui.dialogs import AddFeedChoiceDialog, AddFeedDialog
+from feeds.ui.dialogs import AboutDialog, AddFeedChoiceDialog, AddFeedDialog
 from feeds.ui.panes import FeedTreePane
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -55,8 +56,8 @@ class FeedsApp(QtWidgets.QMainWindow):
 
     def _build_menu_bar(self) -> None:
         menubar = self.menuBar()
-        feed_menu = menubar.addMenu("&Feed")
 
+        feed_menu = menubar.addMenu("&Feed")
         add_action = QtGui.QAction("&Add Feed", self)
         add_action.triggered.connect(self._on_add_feed)
         feed_menu.addAction(add_action)
@@ -64,6 +65,17 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._update_action = QtGui.QAction("&Update Feeds", self)
         self._update_action.triggered.connect(self._on_update_feeds)
         feed_menu.addAction(self._update_action)
+
+        help_menu = menubar.addMenu("&Help")
+        report_action = QtGui.QAction("&Report Issue", self)
+        report_action.triggered.connect(self._on_report_issue)
+        help_menu.addAction(report_action)
+
+        help_menu.addSeparator()
+
+        about_action = QtGui.QAction("&About", self)
+        about_action.triggered.connect(self._on_about)
+        help_menu.addAction(about_action)
 
     def _build_main_area(self, delegate: TwoLineRenderer) -> None:
         self.pane = FeedTreePane(delegate, self)
@@ -270,6 +282,16 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._set_busy(False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage("Feeds updated", 3000)
+
+    def _on_report_issue(self) -> None:
+        log.info("opening issue tracker")
+        webbrowser.open("https://github.com/phagenlocher/feeds/issues")
+
+    def _on_about(self) -> None:
+        from feeds import __version__
+
+        dialog = AboutDialog(__version__, self)
+        dialog.exec()
 
     def _update_single_feed(self, feed_index: int) -> None:
         if self._service is None:

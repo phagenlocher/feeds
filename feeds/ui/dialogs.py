@@ -3,7 +3,7 @@
 import logging
 from urllib.parse import urlparse
 
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -98,3 +98,36 @@ class AddFeedChoiceDialog(QtWidgets.QDialog):
             (item.data(QtWidgets.QListWidgetItem.ItemType.UserType))
             for item in self._list.selectedItems()
         ]
+
+
+class AboutDialog(QtWidgets.QDialog):
+    """About dialog showing version and a GitHub link."""
+
+    def __init__(self, version: str, parent: QtWidgets.QWidget | None = None) -> None:
+        """Show version info and a clickable GitHub link."""
+        super().__init__(parent)
+        self.setWindowTitle("About feeds")
+        self.setFixedSize(300, 150)
+
+        layout = QtWidgets.QVBoxLayout(self)
+
+        title = QtWidgets.QLabel(f"feeds {version}")
+        title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        font = title.font()
+        font.setPointSize(14)
+        font.setBold(True)
+        title.setFont(font)
+        layout.addWidget(title)
+
+        link = QtWidgets.QLabel(
+            '<a href="https://github.com/phagenlocher/feeds">Visit on GitHub</a>'
+        )
+        link.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        link.setOpenExternalLinks(True)
+        layout.addWidget(link)
+
+        layout.addStretch()
+
+        btn = QtWidgets.QPushButton("OK")
+        btn.clicked.connect(self.accept)
+        layout.addWidget(btn, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
