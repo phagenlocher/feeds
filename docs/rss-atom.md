@@ -16,24 +16,22 @@ feeds uses a layered approach for feed parsing and management:
 
 The core feed-management library. Provides:
 
-- `reader.make_reader(path)` — create (or open) a SQLite-backed reader.
-- `reader.add_feed(url)` / `reader.delete_feed(url)` — subscription
+- `reader.make_reader(path)`: create (or open) a SQLite-backed reader.
+- `reader.add_feed(url)` / `reader.delete_feed(url)`: subscription
   management.
-- `reader.update_feeds(workers=N)` / `reader.update_feed(url)` —
-  parallel or single feed update using `feedparser` internally.
-- `reader.get_feeds()` / `reader.get_entries(feed=...)` — query feeds
+- `reader.update_feeds(workers=N)` / `reader.update_feed(url)`: parallel or single feed update using `feedparser` internally.
+- `reader.get_feeds()` / `reader.get_entries(feed=...)`: query feeds
   and entries.
-- `reader.mark_entry_as_read((feed_id, entry_id))` / `mark_entry_as_unread`
-  — read-state tracking.
-- `reader.get_entry_counts(feed=..., read=...)` — aggregate counters.
+- `reader.mark_entry_as_read((feed_id, entry_id))` / `mark_entry_as_unread`: read-state tracking.
+- `reader.get_entry_counts(feed=..., read=...)`: aggregate counters.
 
 ### `feedparser` library
 
 Used directly in two places:
 
-1. **Direct feed validation** during discovery — `feedparser.parse()`
+1. **Direct feed validation** during discovery: `feedparser.parse()`
    checks whether a URL returns parseable feed content.
-2. **Common-path probing** — validates probed feed candidates.
+2. **Common-path probing**: validates probed feed candidates.
 
 ### `requests` library
 
@@ -86,7 +84,7 @@ overridden with the `FEEDS_DB_PATH` environment variable.
 
 ## 3. Data Models
 
-### `Feed` — `feeds/models/feed.py:236`
+### `Feed`: `feeds/models/feed.py:236`
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -96,7 +94,7 @@ class Feed:
     last_updated: datetime | None  # Most recent update timestamp
 ```
 
-### `Entry` — `feeds/models/feed.py:252`
+### `Entry`: `feeds/models/feed.py:252`
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -122,7 +120,7 @@ to create modified copies when toggling read state.
 - **Default path**: `~/.feeds/feeds.db`
 - **Override**: `FEEDS_DB_PATH` environment variable
 - **Managed by**: the `reader` library. No raw SQL is written in
-  feeds — all database operations go through `reader`'s API.
+  feeds; all database operations go through `reader`'s API.
 
 ---
 

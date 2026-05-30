@@ -218,11 +218,7 @@ def _try_common_paths(url: str) -> list[tuple[str, str]]:
                 parsed_feed: feedparser.FeedParserDict = feedparser.parse(resp.content)
                 if parsed_feed.version:
                     feed_data = parsed_feed.feed
-                    title = (
-                        feed_data.get("title", "")
-                        if isinstance(feed_data, dict)
-                        else ""
-                    )
+                    title = feed_data.get("title", "")
                     feeds.append((resp.url, title or feed_url))
             except requests.RequestException:
                 continue
@@ -341,29 +337,22 @@ class FeedReader:
         Returns:
             ``[(feed_url, title), ...]``, or ``[]`` if nothing was found.
         """
-        # Platform-specific pre-handlers (before HTTP request).
-        log.debug("trying platform handlers for %s", url)
         feeds = try_substack(url)
         if feeds:
             log.debug("Substack handler returned %d feed(s)", len(feeds))
             return feeds
-        log.debug("not a Substack URL")
         feeds = try_medium(url)
         if feeds:
             log.debug("Medium handler returned %d feed(s)", len(feeds))
             return feeds
-        log.debug("not a Medium URL")
         feeds = try_reddit(url)
         if feeds:
             log.debug("Reddit handler returned %d feed(s)", len(feeds))
             return feeds
-        log.debug("not a Reddit URL")
         feeds = try_youtube(url)
         if feeds:
             log.debug("YouTube handler returned %d feed(s)", len(feeds))
             return feeds
-        log.debug("not a YouTube URL")
-        log.debug("no platform handler matched, fetching %s for HTML scan", url)
 
         feeds: list[tuple[str, str]] = []
         seen: set[str] = set()
@@ -385,12 +374,12 @@ class FeedReader:
             log.warning("Failed to fetch %s for feed discovery", url)
             return []
 
-        # --- Method 1: Try to parse as a feed directly ---
+        # Method 1: try to parse as a feed directly
         parsed: feedparser.FeedParserDict = feedparser.parse(resp.content)
         if parsed.version:
             log.debug("%s is a feed directly (version=%s)", url, parsed.version)
             feed = parsed.feed
-            title = feed.get("title", "") if isinstance(feed, dict) else ""
+            title = feed.get("title", "")
             _add(url, title or url)
             return feeds  # It IS a feed; skip remaining methods.
         log.debug("%s is not a feed (version=%s)", url, parsed.version)
@@ -398,7 +387,7 @@ class FeedReader:
         content_type: str = resp.headers.get("Content-Type", "")
         is_html = "text/html" in content_type or "application/xhtml+xml" in content_type
 
-        # --- Method 2: HTML <link> tags ---
+        # Method 2: HTML <link> tags
         if is_html:
             log.debug("scanning HTML <link> tags for feed references")
             finder: _FeedLinkFinder = _FeedLinkFinder()
@@ -419,7 +408,7 @@ class FeedReader:
         else:
             log.debug("content type is %s, skipping HTML scan", content_type)
 
-        # --- Method 3: HTTP Link headers ---
+        # Method 3: HTTP Link headers
         link_header: str = resp.headers.get("Link", "")
         if link_header:
             log.debug("parsing HTTP Link headers")
@@ -429,7 +418,7 @@ class FeedReader:
         else:
             log.debug("no Link headers found")
 
-        # --- Method 4: Common path probing (last resort, only for HTML) ---
+        # Method 4: common path probing (only for HTML)
         if not feeds and is_html:
             log.debug("no feeds found yet, probing common paths on %s", resp.url)
             path_feeds = _try_common_paths(resp.url)

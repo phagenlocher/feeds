@@ -12,7 +12,7 @@ well-known path probing.
 
 Methods are tried **in order**, short-circuting on first success:
 
-### Stage 1 — Platform pre-handlers (before any HTTP request)
+### Stage 1: Platform pre-handlers (before any HTTP request)
 
 Specialised handlers that construct feed URLs directly from known URL
 patterns without fetching the page.  This avoids consent walls and
@@ -28,20 +28,20 @@ unnecessary network requests.
 Each handler calls `validate_feed()` from `feeds/discovery/utils.py` to
 verify the candidate is a real, parseable feed before returning it.
 
-### Stage 2 — Direct feed parsing
+### Stage 2: Direct feed parsing
 
 If no platform handler matched, the URL is fetched via HTTP and parsed
 via `feedparser`.  If the response itself is a feed (RSS/Atom/JSON
-Feed), it is returned immediately — no further discovery is needed.
+Feed), it is returned immediately; no further discovery is needed.
 
-### Stage 3 — HTML `<link rel="alternate">` tags
+### Stage 3: HTML `<link rel="alternate">` tags
 
 The `_FeedLinkFinder` HTML parser scans for `<link>` elements with
 `rel="alternate"` and a recognised feed MIME type.  Supports multi-value
 `rel` attributes (e.g. `rel="stylesheet alternate"`) and `<base href>`
 for relative URL resolution.
 
-### Stage 4 — HTTP `Link` headers (RFC 5988)
+### Stage 4: HTTP `Link` headers (RFC 5988)
 
 `_parse_link_header()` in `feeds/models/feed.py:136` parses the `Link`
 response header for feed references in the format:
@@ -53,7 +53,7 @@ Link: </feed.xml>; rel="alternate"; type="application/rss+xml"
 Only entries with `rel="alternate"` and a recognised feed MIME type are
 returned.  Relative `href` values are resolved against the response URL.
 
-### Stage 5 — Common path probing
+### Stage 5: Common path probing
 
 As a last resort, `_try_common_paths()` in `feeds/models/feed.py:171`
 probes well-known feed paths.  Each candidate is fetched and validated
@@ -62,7 +62,7 @@ relative to the current page's parent directory.
 
 ---
 
-## 2. HTML Autodiscovery — The Standard
+## 2. HTML Autodiscovery: The Standard
 
 The most reliable method is a `<link>` element in the `<head>`:
 
@@ -120,7 +120,7 @@ Defined in `_FEED_PATHS` (`feeds/models/feed.py:105`):
 
 `validate_feed()` in `feeds/discovery/utils.py:12` verifies that a
 candidate URL returns valid feed content.  It uses `reader._parser.default_parser()`
-to fetch and parse the URL — if the parser returns a result with a
+to fetch and parse the URL; if the parser returns a result with a
 nonzero `version`, the candidate is considered valid.  The feed title
 is extracted from the parsed result.
 
@@ -165,7 +165,7 @@ The discovery flow in `feeds/app.py`:
 | Substack (custom domain) | `https://customdomain.com/feed` | ✅ (path probing / autodiscovery) |
 | Medium | `https://medium.com/feed/@USERNAME` | ✅ (pre-handler) |
 | Medium | `https://medium.com/feed/PUBLICATION` | ✅ (pre-handler) |
-| Beehiiv | `https://NEWSLETTER.beehiiv.com/feed` | Token — path probing may find `/feed` |
+| Beehiiv | `https://NEWSLETTER.beehiiv.com/feed` | Token; path probing may find `/feed` |
 
 ### Video & social
 
@@ -174,8 +174,8 @@ The discovery flow in `feeds/app.py`:
 | YouTube (channel ID) | `https://www.youtube.com/feeds/videos.xml?channel_id=UC_...` | ✅ (pre-handler) |
 | YouTube (legacy user) | `https://www.youtube.com/feeds/videos.xml?user=NAME` | ✅ (pre-handler) |
 | YouTube (handle) | `https://www.youtube.com/feeds/videos.xml?user=NAME` | ✅ (via oEmbed) |
-| YouTube (playlist) | `https://www.youtube.com/feeds/videos.xml?playlist_id=ID` | Token — not implemented |
-| Tumblr | `https://example.tumblr.com/rss` | Token — path probing may find `/rss` or `/rss.xml` |
+| YouTube (playlist) | `https://www.youtube.com/feeds/videos.xml?playlist_id=ID` | Token; not implemented |
+| Tumblr | `https://example.tumblr.com/rss` | Token; path probing may find `/rss` or `/rss.xml` |
 | Bluesky | `https://bsky.app/profile/USERNAME/rss` | ❌ |
 | Mastodon | `https://mastodon.social/@USERNAME.rss` | ❌ |
 
@@ -197,7 +197,7 @@ The discovery flow in `feeds/app.py`:
 
 Podcasts are natively RSS-based.  Every podcast has a feed URL (RSS with
 `<enclosure>` tags pointing to audio files).  feeds can subscribe to
-podcast feeds directly if the URL is known — but there is no podcast
+podcast feeds directly if the URL is known, but there is no podcast
 directory search or dedicated podcast discovery.
 
 ---
@@ -240,23 +240,20 @@ Given a URL:
 
 ### Python
 
-- **[feedsearch](https://pypi.org/project/feedsearch/)** — Synchronous
+- **[feedsearch](https://pypi.org/project/feedsearch/)**: Synchronous
   feed discovery library: searches `<link>` tags, does CMS detection,
   probes common paths.
-- **[feedsearch-crawler](https://pypi.org/project/feedsearch-crawler/)** —
-  Async version; embeddable in scrapers and aggregators.
-- **[Feedsearch API](https://feedsearch.dev/)** — REST API for feed
-  discovery.
+- **[feedsearch-crawler](https://pypi.org/project/feedsearch-crawler/)**: Async version; embeddable in scrapers and aggregators.
+- **[Feedsearch API](https://feedsearch.dev/)**: REST API for feed discovery.
 
 ### Browser extensions
 
-- **Awesome RSS** — Detects `<link rel="alternate">` tags, shows toolbar
-  icon.
-- **RSS Feed URL Finder** — Lightweight feed detector.
-- Feedly / Inoreader — Built-in feed detection in the reader app.
+- **Awesome RSS**: Detects `<link rel="alternate">` tags, shows toolbar icon.
+- **RSS Feed URL Finder**: Lightweight feed detector.
+- Feedly / Inoreader: Built-in feed detection in the reader app.
 
 ### Online tools
 
-- **Tiny RSS Finder** — Scans meta tags, common paths, platform patterns.
-- **W3C Feed Validator** — Validates whether a URL is a well-formed feed.
-- **RSS.app** — Can generate a feed for sites that don't have one.
+- **Tiny RSS Finder**: Scans meta tags, common paths, platform patterns.
+- **W3C Feed Validator**: Validates whether a URL is a well-formed feed.
+- **RSS.app**: Can generate a feed for sites that don't have one.

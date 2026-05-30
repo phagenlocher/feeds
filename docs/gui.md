@@ -1,7 +1,7 @@
 # GUI Architecture
 
 feeds uses **PySide6** (Qt for Python) for its desktop GUI. The UI is
-built entirely programmatically — no `.ui` files or QSS stylesheets.
+built entirely programmatically; no `.ui` files or QSS stylesheets.
 
 ```
 FeedsApp (QMainWindow)                [feeds/app.py:18]
@@ -23,14 +23,14 @@ FeedsApp (QMainWindow)                [feeds/app.py:18]
 
 ## 1. Entry Point
 
-**`feeds/__main__.py`** — `python -m feeds`
+**`feeds/__main__.py`**: `python -m feeds`
 
 Parses `-v`/`--verbose` for debug logging, creates a `QApplication`,
 instantiates `FeedsApp`, and enters the Qt event loop.
 
 ---
 
-## 2. Main Window — `FeedsApp`
+## 2. Main Window: `FeedsApp`
 
 **File:** `feeds/app.py:18`
 
@@ -64,7 +64,7 @@ background `QThread`. Callbacks rebuild the tree via `refresh(reader)`.
 
 ---
 
-## 3. Tree Pane — `FeedTreePane`
+## 3. Tree Pane: `FeedTreePane`
 
 **File:** `feeds/ui/panes.py:30`
 
@@ -86,21 +86,21 @@ contains a single `FeedTreeWidget(QTreeWidget)` where:
 | `remove_feed_requested` | `int` (feed row) | "Remove feed" context menu |
 | `update_feed_requested` | `int` (feed row) | "Update feed" context menu |
 
-### Display — feed items
+### Display: feed items
 
 Each feed item shows:
-- **Title** — feed title with unread count: `"Feed Name (3)"`
-- **Subtitle** — last-updated date (`"2025-12-01"`)
-- **Bold** — indicates unread entries exist
+- **Title**: feed title with unread count: `"Feed Name (3)"`
+- **Subtitle**: last-updated date (`"2025-12-01"`)
+- **Bold**: indicates unread entries exist
 
-### Display — entry items
+### Display: entry items
 
 Each entry item shows:
-- **Title** — entry headline
-- **Subtitle** — `"Author · 2025-12-01"` (author and date, joined by ·)
-- **Bold** — indicates the entry is unread
+- **Title**: entry headline
+- **Subtitle**: `"Author · 2025-12-01"` (author and date, joined by ·)
+- **Bold**: indicates the entry is unread
 
-### Context menu — feed (right-click)
+### Context menu: feed (right-click)
 
 | Action | Behavior |
 |--------|----------|
@@ -109,7 +109,7 @@ Each entry item shows:
 | Copy URL | Copies feed URL to system clipboard |
 | Update feed | Emits `update_feed_requested(feed_index)` |
 
-### Context menu — entry (right-click)
+### Context menu: entry (right-click)
 
 | Action | Behavior |
 |--------|----------|
@@ -119,29 +119,29 @@ Each entry item shows:
 
 The pane handles entry-level visual updates directly (no signal round-trip):
 
-- `mark_entry_read(item)` — removes bold from entry, decrements parent feed unread count
-- `mark_entry_unread(item)` — adds bold to entry, increments parent feed unread count
+- `mark_entry_read(item)`: removes bold from entry, decrements parent feed unread count
+- `mark_entry_unread(item)`: adds bold to entry, increments parent feed unread count
 
 Bulk operations (update all, mark all as read, remove) trigger a full
 `refresh(reader)` which rebuilds the entire tree from the database.
 
 ---
 
-## 4. Tree Widget — `FeedTreeWidget`
+## 4. Tree Widget: `FeedTreeWidget`
 
 **File:** `feeds/ui/widgets.py:11`
 
 A `QTreeWidget` subclass used by `FeedTreePane`. Features:
 
-- **Hand cursor** — changes to `PointingHandCursor` when hovering over
+- **Hand cursor**: changes to `PointingHandCursor` when hovering over
   items (via `eventFilter` on the viewport).
-- **Font scaling** — `set_font_size()` recalculates item heights and
+- **Font scaling**: `set_font_size()` recalculates item heights and
   reapplies fonts recursively through the tree hierarchy.
-- **Item builder** — `build_item(title, subtitle, bold)` creates a
+- **Item builder**: `build_item(title, subtitle, bold)` creates a
   `QTreeWidgetItem` with the subtitle stored in `UserRole` data.
-- **Animations** — `setAnimated(True)` for smooth expand/collapse.
-- **Hidden header** — no column headers displayed.
-- **Selection styling** — blue background / white text via inline
+- **Animations**: `setAnimated(True)` for smooth expand/collapse.
+- **Hidden header**: no column headers displayed.
+- **Selection styling**: blue background / white text via inline
   stylesheet.
 
 ### Custom data roles (widgets.py)
@@ -154,7 +154,7 @@ A `QTreeWidget` subclass used by `FeedTreePane`. Features:
 
 ---
 
-## 5. Item Delegate — `TwoLineRenderer`
+## 5. Item Delegate: `TwoLineRenderer`
 
 **File:** `feeds/ui/delegates.py:6`
 
@@ -167,13 +167,13 @@ Subtitle (gray #888888, smaller font)      ← bottom half
 
 - **Selected state**: Uses palette highlight colors for both title and
   subtitle.
-- **Height**: `max(46, font.pointSize() * 4)` — scales with font size.
+- **Height**: `max(46, font.pointSize() * 4)`; scales with font size.
 
 ---
 
 ## 6. Dialogs
 
-### `AddFeedDialog` — `feeds/ui/dialogs.py:11`
+### `AddFeedDialog`: `feeds/ui/dialogs.py:11`
 
 Simple dialog with a URL input field:
 
@@ -181,7 +181,7 @@ Simple dialog with a URL input field:
   returns both a `scheme` and `netloc`.
 - **Enter key** submits, Escape cancels.
 
-### `AddFeedChoiceDialog` — `feeds/ui/dialogs.py:46`
+### `AddFeedChoiceDialog`: `feeds/ui/dialogs.py:46`
 
 Shown when multiple feeds are discovered from a single URL:
 
@@ -193,19 +193,19 @@ Shown when multiple feeds are discovered from a single URL:
 
 ## 7. Background Threading
 
-### `FeedService` — `feeds/services/feed_service.py:21`
+### `FeedService`: `feeds/services/feed_service.py:21`
 
 Orchestrates async feed operations. Maintains a single `WorkerThread`
 and a FIFO queue of pending operations.
 
-- `run(fn, name, on_done, on_error)` — enqueues or starts immediately
+- `run(fn, name, on_done, on_error)`: enqueues or starts immediately
   if no worker is active.
 - Sequential execution: each operation must finish before the next
   starts (`_process_queue`).
 - High-level wrappers: `add_feed`, `discover_feeds`, `update_feed`,
   `update_feeds`, `delete_feed`, `mark_all_as_read`.
 
-### `WorkerThread` — `feeds/services/worker.py:11`
+### `WorkerThread`: `feeds/services/worker.py:11`
 
 Minimal `QThread` subclass:
 

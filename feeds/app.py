@@ -1,7 +1,6 @@
 """Main window orchestrating menu bar, tree pane, zoom, and async operations."""
 
 import logging
-import traceback
 import webbrowser
 from collections.abc import Callable
 
@@ -41,7 +40,6 @@ class FeedsApp(QtWidgets.QMainWindow):
             self._service = FeedService(self.reader)
         except Exception:
             log.exception("failed to initialize FeedReader")
-            traceback.print_exc()
             self.statusBar().showMessage("Failed to open feed database", 0)
         else:
             self._apply_font_size()
@@ -50,7 +48,6 @@ class FeedsApp(QtWidgets.QMainWindow):
                 self.pane.refresh(self.reader)
             except Exception:
                 log.exception("failed to load feeds")
-                traceback.print_exc()
                 self.statusBar().showMessage("Failed to load feeds from database", 0)
             self._update_all_feeds(scheduled=True)
 
@@ -90,9 +87,7 @@ class FeedsApp(QtWidgets.QMainWindow):
     def _set_base_font(self) -> None:
         font = QtGui.QFont()
         font.setPointSize(self._font_size)
-        app = QtWidgets.QApplication.instance()
-        if isinstance(app, QtWidgets.QApplication):
-            app.setFont(font)
+        QtWidgets.QApplication.instance().setFont(font)
 
     def _setup_zoom_shortcuts(self) -> None:
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl++"), self, self._zoom_in)

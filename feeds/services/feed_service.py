@@ -1,6 +1,7 @@
 """Async orchestration: runs feed operations in background threads."""
 
 import logging
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -29,7 +30,7 @@ class FeedService:
         """Store the reader reference; no worker running, no queued operations."""
         self._reader: FeedReader = reader
         self._worker: WorkerThread | None = None
-        self._queue: list[_PendingOp] = []
+        self._queue: deque[_PendingOp] = deque()
 
     @property
     def is_busy(self) -> bool:
@@ -42,19 +43,13 @@ class FeedService:
         name: str,
         on_done: Callable[[], object] | None = None,
         on_error: Callable[[str], object] | None = None,
-    ) -> bool:
-        """Execute *fn* in a background thread.
-
-        If an operation is already in progress, *fn* is queued and will
-        run when the current operation finishes.
-        Always returns True.
-        """
+    ) -> None:
+        """Run *fn* in a background thread, or queue it if one is already running."""
         if self._worker is not None:
             self._queue.append(_PendingOp(fn, name, on_done, on_error))
-            return True
+            return
 
         self._start(fn, name, on_done, on_error)
-        return True
 
     def _start(
         self,
@@ -86,7 +81,7 @@ class FeedService:
 
     def _process_queue(self) -> None:
         if self._queue and self._worker is None:
-            op: _PendingOp = self._queue.pop(0)
+            op: _PendingOp = self._queue.popleft()
             self._start(op.fn, op.name, op.on_done, op.on_error)
 
     def add_feed(
