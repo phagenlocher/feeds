@@ -45,6 +45,46 @@ class AddFeedDialog(QtWidgets.QDialog):
         return self.url_input.text().strip()
 
 
+class RenameFeedDialog(QtWidgets.QDialog):
+    """Dialog for renaming a feed's display title."""
+
+    def __init__(
+        self, current_title: str, parent: QtWidgets.QWidget | None = None
+    ) -> None:
+        """Modal dialog with a pre-filled title field and a Rename button."""
+        super().__init__(parent)
+        self.setWindowTitle("Rename Feed")
+        self.setFixedSize(400, 120)
+
+        self.title_input: QtWidgets.QLineEdit = QtWidgets.QLineEdit()
+        self.title_input.setText(current_title)
+        self.title_input.selectAll()
+        self.title_input.setFocus()
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(QtWidgets.QLabel("Feed title:"))
+        layout.addWidget(self.title_input)
+
+        self.rename_btn: QtWidgets.QPushButton = QtWidgets.QPushButton("Rename")
+        self.rename_btn.setEnabled(bool(current_title.strip()))
+        self.rename_btn.clicked.connect(self._on_accepted)
+        self.title_input.returnPressed.connect(self._on_accepted)
+        self.title_input.textChanged.connect(self._validate)
+        layout.addWidget(self.rename_btn)
+
+    def _on_accepted(self) -> None:
+        log.info("rename feed dialog accepted: %s", self.title)
+        self.accept()
+
+    def _validate(self, text: str) -> None:
+        self.rename_btn.setEnabled(bool(text.strip()))
+
+    @property
+    def title(self) -> str:
+        """The trimmed title text currently in the input field."""
+        return self.title_input.text().strip()
+
+
 class AddFeedChoiceDialog(QtWidgets.QDialog):
     """Dialog for choosing one or more feeds discovered from a URL."""
 

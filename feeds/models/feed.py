@@ -235,14 +235,16 @@ class Feed:
 
     Attributes:
         id: The feed's URL (used as the unique identifier).
-        title: Human-readable display title.
+        title: Human-readable display title (user title if set, else original).
         last_updated: Timestamp of the most recent update, or ``None``
             if never updated.
+        user_title: Custom title set by the user, or ``None``.
     """
 
     id: str
     title: str
     last_updated: datetime | None
+    user_title: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -487,7 +489,12 @@ class FeedReader:
             :class:`Feed` instances in an unspecified order.
         """
         for f in self.reader.get_feeds():
-            yield Feed(id=f.url, title=f.title or "No Title", last_updated=f.updated)
+            yield Feed(
+                id=f.url,
+                title=f.resolved_title or "No Title",
+                last_updated=f.updated,
+                user_title=f.user_title,
+            )
 
     def get_posts(self, feed: Feed) -> Iterator[Entry]:
         """Yield all entries (posts) belonging to a feed.
@@ -532,6 +539,16 @@ class FeedReader:
         """
         log.info("marking entry unread: %s", entry.entry_id)
         self.reader.mark_entry_as_unread((entry.feed_id, entry.entry_id))
+
+    def set_feed_user_title(self, feed: Feed, title: str) -> None:
+        """Set a custom display title for a feed.
+
+        Args:
+            feed: The feed to rename.
+            title: The new display title.
+        """
+        log.info("setting user title for feed %s to '%s'", feed.id, title)
+        self.reader.set_feed_user_title(feed.id, title)
 
     def delete_feed(self, feed: Feed) -> None:
         """Unsubscribe a feed and remove all its entries.

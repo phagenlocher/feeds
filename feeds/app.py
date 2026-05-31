@@ -9,7 +9,12 @@ from PySide6 import QtGui, QtWidgets
 from feeds.models.feed import Entry, FeedReader
 from feeds.services.feed_service import FeedService
 from feeds.ui.delegates import TwoLineRenderer
-from feeds.ui.dialogs import AboutDialog, AddFeedChoiceDialog, AddFeedDialog
+from feeds.ui.dialogs import (
+    AboutDialog,
+    AddFeedChoiceDialog,
+    AddFeedDialog,
+    RenameFeedDialog,
+)
 from feeds.ui.panes import FeedTreePane
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -81,6 +86,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self.pane.entry_unread_requested.connect(self._on_entry_unread)
         self.pane.read_all_requested.connect(self._read_all_async)
         self.pane.remove_feed_requested.connect(self._remove_feed_async)
+        self.pane.rename_feed_requested.connect(self._rename_feed)
         self.pane.update_feed_requested.connect(self._update_single_feed)
         self.setCentralWidget(self.pane)
 
@@ -333,6 +339,39 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._set_busy(False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage("Feed removed", 3000)
+
+    def _rename_feed(self, feed_index: int) -> None:
+        if self._service is None:
+            return
+        if feed_index >= len(self.pane.feeds):
+            return
+        feed = self.pane.feeds[feed_index]
+
+        dialog = RenameFeedDialog(feed.title, self)
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            log.info("rename feed cancelled by user")
+            return
+        title = dialog.title
+        if not title:
+            return
+
+        log.info("renaming feed %s to '%s'", feed.id, title)
+        self.statusBar().showMessage(f"Renaming {feed.title}\u2026")
+        self._set_busy(True)
+        self._service.set_feed_user_title(
+            feed,
+            title,
+            on_done=self._on_rename_feed_done,
+            on_error=self._on_service_error,
+        )
+
+    def _on_rename_feed_done(self) -> None:
+        if self.reader is None:
+            return
+        log.info("feed renamed")
+        self._set_busy(False)
+        self.pane.refresh(self.reader)
+        self.statusBar().showMessage("Feed renamed", 3000)
 
     def _read_all_async(self, feed_index: int) -> None:
         if self._service is None:

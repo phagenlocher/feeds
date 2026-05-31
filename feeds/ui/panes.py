@@ -40,6 +40,7 @@ class FeedMenuAction(IntEnum):
     COPY_URL = auto()
     READ_ALL = auto()
     REMOVE = auto()
+    RENAME = auto()
     UPDATE = auto()
 
 
@@ -58,6 +59,7 @@ class FeedTreePane(QtWidgets.QWidget):
     entry_unread_requested: QtCore.Signal = QtCore.Signal(Entry)
     read_all_requested: QtCore.Signal = QtCore.Signal(int)
     remove_feed_requested: QtCore.Signal = QtCore.Signal(int)
+    rename_feed_requested: QtCore.Signal = QtCore.Signal(int)
     update_feed_requested: QtCore.Signal = QtCore.Signal(int)
 
     def __init__(
@@ -216,6 +218,7 @@ class FeedTreePane(QtWidgets.QWidget):
         title = _feed_label(feed, unread)
         ts = feed.last_updated.strftime("%Y-%m-%d") if feed.last_updated else ""
         item = self.tree.build_item(title, ts, bool(unread), item_type=ItemType.FEED)
+        item.setToolTip(0, feed.id)
         item.setData(0, ItemTypeRole, ItemType.FEED)
         item.setData(0, FeedIndexRole, feed_idx)
         item.setData(0, DataRole, feed)
@@ -320,6 +323,9 @@ class FeedTreePane(QtWidgets.QWidget):
         act.setData(FeedMenuAction.READ_ALL)
         act = menu.addAction("Remove feed")
         act.setData(FeedMenuAction.REMOVE)
+        menu.addSeparator()
+        act = menu.addAction("Rename")
+        act.setData(FeedMenuAction.RENAME)
         act = menu.addAction("Copy URL")
         act.setData(FeedMenuAction.COPY_URL)
         act = menu.addAction("Update feed")
@@ -348,6 +354,9 @@ class FeedTreePane(QtWidgets.QWidget):
                 if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
                     log.info("remove feed confirmed: %s", feed.id)
                     self.remove_feed_requested.emit(feed_index)
+            case FeedMenuAction.RENAME:
+                log.info("rename feed requested: %s", feed.id)
+                self.rename_feed_requested.emit(feed_index)
             case FeedMenuAction.UPDATE:
                 log.info("update feed requested: %s", feed.id)
                 self.update_feed_requested.emit(feed_index)

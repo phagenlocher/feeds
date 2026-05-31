@@ -140,6 +140,22 @@ class FeedService:
             on_error,
         )
 
+    def set_feed_user_title(
+        self,
+        feed: Feed,
+        title: str,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        """Queue reader.set_feed_user_title(feed, title) on a background worker."""
+        log.info("setting feed title for %s to '%s'", feed.id, title)
+        self.run(
+            lambda: self._reader.set_feed_user_title(feed, title),
+            "set_feed_user_title",
+            on_done,
+            on_error,
+        )
+
     def delete_feed(
         self,
         feed: Feed,
