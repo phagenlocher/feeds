@@ -68,6 +68,16 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._update_action.triggered.connect(self._on_update_feeds)
         feed_menu.addAction(self._update_action)
 
+        feed_menu.addSeparator()
+
+        export_action = QtGui.QAction("&Export URLs\u2026", self)
+        export_action.triggered.connect(self._on_export_urls)
+        feed_menu.addAction(export_action)
+
+        import_action = QtGui.QAction("&Import URLs\u2026", self)
+        import_action.triggered.connect(self._on_import_urls)
+        feed_menu.addAction(import_action)
+
         help_menu = menubar.addMenu("&Help")
         report_action = QtGui.QAction("&Report Issue", self)
         report_action.triggered.connect(self._on_report_issue)
@@ -246,18 +256,101 @@ class FeedsApp(QtWidgets.QMainWindow):
         _service.add_feed(feed_url, on_done=on_added, on_error=self._on_service_error)
 
     def _on_add_feed_done(
-        self, url: str, on_next: Callable[[], object] | None = None
+        self,
+        url: str,
+        on_next: Callable[[], object] | None = None,
+        expand: bool = True,
     ) -> None:
         if self.reader is None:
             return
         log.info("feed added: %s", url)
         self.pane.refresh(self.reader)
-        self.pane.expand_feed_by_url(url)
+        if expand:
+            self.pane.expand_feed_by_url(url)
         if on_next:
             on_next()
         else:
             self._set_busy(False)
             self.statusBar().showMessage("Feed added", 3000)
+
+    def _on_export_urls(self) -> None:
+        """Open save dialog to export all feed URLs to a text file."""
+        if self.reader is None:
+            return
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Export Feed URLs", "", "Text files (*.txt)"
+        )
+        if not path:
+            return
+        if not path.endswith(".txt"):
+            path += ".txt"
+        try:
+            urls: list[str] = [feed.id for feed in self.reader.get_feeds()]
+            with open(path, "w") as f:
+                for url in urls:
+                    f.write(url + "\n")
+            log.info("exported %d feed URLs to %s", len(urls), path)
+            self.statusBar().showMessage(f"Exported {len(urls)} feed URLs", 3000)
+        except Exception:
+            log.exception("failed to export feed URLs")
+            self.statusBar().showMessage("Failed to export feed URLs", 5000)
+
+    def _on_import_urls(self) -> None:
+        """Open file dialog to import feed URLs from a text file."""
+        if self._service is None:
+            return
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Import Feed URLs", "", "Text files (*.txt)"
+        )
+        if not path:
+            return
+        try:
+            with open(path) as f:
+                urls: list[str] = [line.strip() for line in f if line.strip()]
+        except Exception:
+            log.exception("failed to read import file")
+            self.statusBar().showMessage("Failed to read import file", 5000)
+            return
+        if not urls:
+            self.statusBar().showMessage("No URLs found in file", 3000)
+            return
+        log.info("importing %d feed URLs from %s", len(urls), path)
+        self.statusBar().showMessage(f"Importing {len(urls)} feeds\u2026")
+        self._set_busy(True)
+        self._import_urls_sequentially(urls, 0)
+
+    def _import_urls_sequentially(self, urls: list[str], index: int) -> None:
+        """Add and update one feed URL at a time, then recurse."""
+        if index >= len(urls):
+            if self.reader is None:
+                return
+            self._set_busy(False)
+            self.statusBar().showMessage("Feeds imported", 3000)
+            return
+
+        _service = self._service
+        if _service is None:
+            return
+
+        url = urls[index]
+        total = len(urls)
+
+        def on_added() -> None:
+            self.statusBar().showMessage(f"Importing feed {index + 1}/{total}\u2026")
+            self._set_busy(True)
+            _service.update_feed(
+                url,
+                on_done=lambda: self._on_add_feed_done(
+                    url,
+                    on_next=lambda: self._import_urls_sequentially(urls, index + 1),
+                    expand=False,
+                ),
+                on_error=self._on_service_error,
+            )
+
+        self.statusBar().showMessage(f"Adding feed {index + 1}/{total}\u2026")
+        self._set_busy(True)
+        _service.add_feed(url, on_done=on_added, on_error=self._on_service_error)
 
     def _update_all_feeds(self, scheduled: bool = False) -> None:
         """Update all feeds with status and busy feedback."""
