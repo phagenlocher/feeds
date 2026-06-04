@@ -6,7 +6,8 @@ built entirely programmatically; no `.ui` files or QSS stylesheets.
 ```
 FeedsApp (QMainWindow)                [feeds/app.py:18]
 ├── Menu Bar: "Feed" menu with "Add Feed" | "Update Feeds"
-├── FeedTreePane                      [feeds/ui/panes.py:30]
+├── FeedTreePane                      [feeds/ui/panes.py:54]
+│   ├── SearchBar (QLineEdit)
 │   └── FeedTreeWidget (QTreeWidget)
 │       ├── Feed 1 (top-level, collapsible)
 │       │   ├── Entry 1 (child)
@@ -240,3 +241,40 @@ When a tree entry is activated (double-clicked):
 3. `FeedsApp` marks the entry as read in the database.
 4. The entry's URL is opened in the system default browser via
    `webbrowser.open()`.
+
+---
+
+## 10. Search / Filter
+
+A `QLineEdit` search bar sits above the tree widget in `FeedTreePane`,
+hidden by default.  It provides fuzzy filtering of entries by title,
+powered by **rapidfuzz** (`fuzz.partial_ratio`).
+
+### Keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+F` | Toggle the search bar (show/hide). When shown, it is focused and existing text is selected. |
+| `Escape` | Clear the search bar, hide it, and return focus to the tree. |
+
+### Fuzzy matching
+
+- Each entry's title is compared against the search query using
+  `rapidfuzz.fuzz.partial_ratio` with a threshold of 60.
+- Entries that match are shown; non-matching entries are hidden via
+  `QTreeWidgetItem.setHidden(True)`.
+- Feed items (top-level) are hidden when they have zero visible
+  children.
+- An **empty** search bar clears all filters: every entry and feed is
+  shown.
+
+### Interaction with tree rebuilds
+
+`refresh()` reapplies the current filter text after rebuilding the
+tree from the database.  This means the filter persists across feed
+updates, additions, removals, and read-state bulk changes.
+
+State restoration (`_save_state` / `_restore_state`) runs after
+filtering.  If the previously selected item is now hidden due to
+filtering, `scrollToItem` is skipped to avoid jumping to an
+off-screen item.

@@ -110,6 +110,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+="), self, self._zoom_in)
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+-"), self, self._zoom_out)
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+0"), self, self._zoom_reset)
+        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+F"), self, self._toggle_search)
 
     def _zoom_in(self) -> None:
         self._font_size += 1
@@ -122,6 +123,9 @@ class FeedsApp(QtWidgets.QMainWindow):
     def _zoom_reset(self) -> None:
         self._font_size = 12
         self._apply_font_size()
+
+    def _toggle_search(self) -> None:
+        self.pane.toggle_search()
 
     def _apply_font_size(self) -> None:
         self._set_base_font()

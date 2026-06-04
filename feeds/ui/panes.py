@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from enum import IntEnum, auto
 from typing import assert_never
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
+from rapidfuzz import fuzz
 
 from feeds.models.feed import Entry, Feed, FeedReader
 from feeds.ui.widgets import (
@@ -18,6 +19,8 @@ from feeds.ui.widgets import (
 )
 
 log: logging.Logger = logging.getLogger(__name__)
+
+_FUZZY_THRESHOLD: int = 80
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,10 +73,25 @@ class FeedTreePane(QtWidgets.QWidget):
         """Build the pane with a tree widget using the given delegate."""
         super().__init__(parent)
         self.feeds: list[Feed] = []
+        self._filter_text: str = ""
         self.tree: FeedTreeWidget
+        self.search_bar: QtWidgets.QLineEdit
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self.search_bar = QtWidgets.QLineEdit(self)
+        self.search_bar.setVisible(False)
+        self.search_bar.setPlaceholderText("Filter entries\u2026")
+        self.search_bar.setClearButtonEnabled(True)
+        self.search_bar.textChanged.connect(self._on_filter_changed)
+        layout.addWidget(self.search_bar)
+
+        escape_shortcut = QtGui.QShortcut(
+            QtGui.QKeySequence(QtCore.Qt.Key.Key_Escape), self.search_bar
+        )
+        escape_shortcut.activated.connect(self._on_filter_escape)
 
         self.tree = FeedTreeWidget(self)
         self.tree.setItemDelegate(delegate)
@@ -185,7 +203,7 @@ class FeedTreePane(QtWidgets.QWidget):
         sel_target: QtWidgets.QTreeWidgetItem | None,
     ) -> None:
         self.tree.verticalScrollBar().setValue(state.scroll_position)
-        if sel_target is not None:
+        if sel_target is not None and not sel_target.isHidden():
             self.tree.scrollToItem(
                 sel_target,
                 QtWidgets.QAbstractItemView.ScrollHint.EnsureVisible,
@@ -199,6 +217,7 @@ class FeedTreePane(QtWidgets.QWidget):
         for feed_idx, feed in enumerate(self.feeds):
             feed_item = self._build_feed_item(feed, feed_idx, reader)
             self.tree.addTopLevelItem(feed_item)
+        self._apply_filter()
         self._restore_state(prev_state)
 
     def mark_entry_read(self, item: QtWidgets.QTreeWidgetItem) -> None:
@@ -392,3 +411,52 @@ class FeedTreePane(QtWidgets.QWidget):
                 self.entry_unread_requested.emit(entry)
             case _ as unreachable:
                 assert_never(unreachable)
+
+    def _on_filter_changed(self, text: str) -> None:
+        self._filter_text = text
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        query = self._filter_text.lower()
+        for i in range(self.tree.topLevelItemCount()):
+            feed_item: QtWidgets.QTreeWidgetItem | None = self.tree.topLevelItem(i)
+            if feed_item is None:
+                continue
+            if not query:
+                feed_item.setHidden(False)
+                for j in range(feed_item.childCount()):
+                    child: QtWidgets.QTreeWidgetItem | None = feed_item.child(j)
+                    if child is not None:
+                        child.setHidden(False)
+            else:
+                any_visible = False
+                for j in range(feed_item.childCount()):
+                    entry_child: QtWidgets.QTreeWidgetItem | None = feed_item.child(j)
+                    if entry_child is None:
+                        continue
+                    entry: Entry | None = entry_child.data(0, DataRole)
+                    match: bool = (
+                        entry is not None
+                        and fuzz.partial_ratio(query, entry.title.lower())
+                        >= _FUZZY_THRESHOLD
+                    )
+                    entry_child.setHidden(not match)
+                    if match:
+                        any_visible = True
+                feed_item.setHidden(not any_visible)
+
+    def toggle_search(self) -> None:
+        """Toggle the search bar visibility; hide clears the filter."""
+        if self.search_bar.isVisible():
+            self.search_bar.setVisible(False)
+            self._on_filter_escape()
+        else:
+            self.search_bar.setVisible(True)
+            self.search_bar.setFocus()
+            self.search_bar.selectAll()
+
+    def _on_filter_escape(self) -> None:
+        if self.search_bar.text():
+            self.search_bar.clear()
+        self.search_bar.setVisible(False)
+        self.tree.setFocus()
