@@ -4,11 +4,11 @@
 - Linting and formatting must be checked and fixed after every code change.
 - When planning, always check if documentation (README.md, AGENTS.md, docs/) needs updates and plan accordingly.
 
-## Commands
-- `just run`: run the app
-- `just build`: build binary (output: dist/main)
+## Commands for agents
 - `just format`: run formatting
 - `just lint`: run linting
+
+Agents may not use any other just commands.
 
 ## Conventions
 - Python ≥3.10, PySide6, reader lib
