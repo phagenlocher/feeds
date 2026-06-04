@@ -500,27 +500,33 @@ class FeedReader:
         """Yield all entries (posts) belonging to a feed.
 
         Entries without a ``link`` attribute are skipped with a
-        warning log.
+        warning log.  Results are sorted by ``last_updated`` (newest
+        first); entries without a date sort last.
 
         Args:
             feed: The feed whose entries to retrieve.
 
         Yields:
-            :class:`Entry` instances in insertion order.
+            :class:`Entry` instances sorted by last_updated (newest first).
         """
+        entries: list[Entry] = []
         for e in self.reader.get_entries(feed=feed.id):
             if not e.link:
                 log.warning("entry %s has no link, skipping", e.id)
                 continue
-            yield Entry(
-                url=e.link,
-                title=e.title or "No Title",
-                last_updated=e.updated or e.published,
-                entry_id=e.id,
-                feed_id=feed.id,
-                read=e.read,
-                author=e.authors_str or "",
+            entries.append(
+                Entry(
+                    url=e.link,
+                    title=e.title or "No Title",
+                    last_updated=e.updated or e.published,
+                    entry_id=e.id,
+                    feed_id=feed.id,
+                    read=e.read,
+                    author=e.authors_str or "",
+                )
             )
+        entries.sort(key=lambda e: e.last_updated or datetime.min, reverse=True)
+        yield from entries
 
     def mark_entry_as_read(self, entry: Entry) -> None:
         """Mark a single entry as read.
