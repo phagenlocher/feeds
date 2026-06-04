@@ -128,6 +128,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self.pane.remove_feed_requested.connect(self._remove_feed_async)
         self.pane.rename_feed_requested.connect(self._rename_feed)
         self.pane.update_feed_requested.connect(self._update_single_feed)
+        self.pane.prune_feed_requested.connect(self._prune_feed_async)
         self.setCentralWidget(self.pane)
 
     def _set_base_font(self) -> None:
@@ -520,3 +521,27 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._set_busy(False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage("All marked as read", 3000)
+
+    def _prune_feed_async(self, feed_index: int, n: int) -> None:
+        if self._service is None:
+            return
+        if feed_index >= len(self.pane.feeds):
+            return
+        feed = self.pane.feeds[feed_index]
+        log.info("pruning feed to %d entries: %s", n, feed.id)
+        self.statusBar().showMessage(f"Pruning {feed.title}\u2026")
+        self._set_busy(True)
+        self._service.prune_feed(
+            feed,
+            n,
+            on_done=lambda: self._on_prune_feed_done(feed.title),
+            on_error=self._on_service_error,
+        )
+
+    def _on_prune_feed_done(self, feed_title: str) -> None:
+        if self.reader is None:
+            return
+        log.info("feed pruned: %s", feed_title)
+        self._set_busy(False)
+        self.pane.refresh(self.reader)
+        self.statusBar().showMessage(f"{feed_title} pruned", 3000)

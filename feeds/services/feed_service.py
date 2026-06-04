@@ -182,3 +182,19 @@ class FeedService:
             on_done,
             on_error,
         )
+
+    def prune_feed(
+        self,
+        feed: Feed,
+        n: int,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        """Enqueue reader.prune_feed(feed, n) on a background worker thread."""
+        log.info("pruning feed %s to %d entries", feed.id, n)
+        self.run(
+            lambda: self._reader.prune_feed(feed, n),
+            "prune_feed",
+            on_done,
+            on_error,
+        )

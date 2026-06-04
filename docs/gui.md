@@ -93,7 +93,9 @@ contains a single `FeedTreeWidget(QTreeWidget)` where:
 | `entry_unread_requested` | `Entry` | "Mark Unread" context menu |
 | `read_all_requested` | `int` (feed row) | "Mark all as read" context menu |
 | `remove_feed_requested` | `int` (feed row) | "Remove feed" context menu |
+| `rename_feed_requested` | `int` (feed row) | "Rename" context menu |
 | `update_feed_requested` | `int` (feed row) | "Update feed" context menu |
+| `prune_feed_requested` | `int, int` (feed row, n) | "Prune entries" context menu |
 
 ### Display: feed items
 
@@ -115,6 +117,8 @@ Each entry item shows:
 |--------|----------|
 | Mark all as read | Emits `read_all_requested(feed_index)` |
 | Remove feed | Shows confirmation `QMessageBox`, then emits `remove_feed_requested(feed_index)` |
+| Prune entries | Submenu: presets (10/25/50) and custom N; shows confirmation, then emits `prune_feed_requested(feed_index, n)` |
+| Rename | Emits `rename_feed_requested(feed_index)` |
 | Copy URL | Copies feed URL to system clipboard |
 | Update feed | Emits `update_feed_requested(feed_index)` |
 

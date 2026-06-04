@@ -41,6 +41,7 @@ class FeedMenuAction(IntEnum):
     """Actions available on the feed context menu."""
 
     COPY_URL = auto()
+    PRUNE = auto()
     READ_ALL = auto()
     REMOVE = auto()
     RENAME = auto()
@@ -64,6 +65,7 @@ class FeedTreePane(QtWidgets.QWidget):
     remove_feed_requested: QtCore.Signal = QtCore.Signal(int)
     rename_feed_requested: QtCore.Signal = QtCore.Signal(int)
     update_feed_requested: QtCore.Signal = QtCore.Signal(int)
+    prune_feed_requested: QtCore.Signal = QtCore.Signal(int, int)
 
     def __init__(
         self,
@@ -343,6 +345,14 @@ class FeedTreePane(QtWidgets.QWidget):
         act = menu.addAction("Remove feed")
         act.setData(FeedMenuAction.REMOVE)
         menu.addSeparator()
+        prune_menu = menu.addMenu("Prune entries")
+        for count in (10, 25, 50):
+            act = prune_menu.addAction(f"Prune to {count} entries")
+            act.setData((FeedMenuAction.PRUNE, count))
+        prune_menu.addSeparator()
+        act = prune_menu.addAction("Choose number of entries\u2026")
+        act.setData((FeedMenuAction.PRUNE, -1))
+        menu.addSeparator()
         act = menu.addAction("Rename")
         act.setData(FeedMenuAction.RENAME)
         act = menu.addAction("Copy URL")
@@ -353,7 +363,35 @@ class FeedTreePane(QtWidgets.QWidget):
         action = menu.exec(self.tree.viewport().mapToGlobal(pos))
         if action is None:
             return
-        kind = FeedMenuAction(action.data())
+        action_data = action.data()
+        if isinstance(action_data, tuple):
+            kind, n = action_data
+            if kind is FeedMenuAction.PRUNE:
+                if n == -1:
+                    n, ok = QtWidgets.QInputDialog.getInt(
+                        self,
+                        "Prune entries",
+                        "Number of entries to keep:",
+                        value=25,
+                        minValue=1,
+                        maxValue=99999,
+                    )
+                    if not ok:
+                        return
+                confirm = QtWidgets.QMessageBox.question(
+                    self,
+                    "Prune entries",
+                    f"Keep only the {n} most recent entries in '{feed.title}'?",
+                    QtWidgets.QMessageBox.StandardButton.Yes
+                    | QtWidgets.QMessageBox.StandardButton.No,
+                    QtWidgets.QMessageBox.StandardButton.No,
+                )
+                if confirm != QtWidgets.QMessageBox.StandardButton.Yes:
+                    return
+                log.info("prune feed confirmed: %s (keeping %d entries)", feed.id, n)
+                self.prune_feed_requested.emit(feed_index, n)
+            return
+        kind = FeedMenuAction(action_data)
         match kind:
             case FeedMenuAction.COPY_URL:
                 log.info("copied feed URL: %s", feed.id)
@@ -379,6 +417,8 @@ class FeedTreePane(QtWidgets.QWidget):
             case FeedMenuAction.UPDATE:
                 log.info("update feed requested: %s", feed.id)
                 self.update_feed_requested.emit(feed_index)
+            case FeedMenuAction.PRUNE:
+                pass  # handled via tuple branch above
             case _ as unreachable:
                 assert_never(unreachable)
 

@@ -569,6 +569,41 @@ class FeedReader:
         for e in self.reader.get_entries(feed=feed.id):
             self.reader.mark_entry_as_read((feed.id, e.id))
 
+    def prune_feed(self, feed: Feed, n: int) -> int:
+        """Keep only the *n* most recent entries, delete the rest.
+
+        Entries are sorted by ``updated``/``published`` (newest first).
+        Returns the number of entries deleted.
+
+        Args:
+            feed: The feed to prune.
+            n: The number of most recent entries to keep.
+
+        Returns:
+            The number of entries deleted (0 if nothing was pruned).
+        """
+        entries = list(self.reader.get_entries(feed=feed.id))
+        if len(entries) <= n:
+            log.info("feed %s has %d entries, nothing to prune", feed.id, len(entries))
+            return 0
+
+        def _sort_key(e: reader.types.Entry) -> datetime:
+            return e.updated or e.published or datetime.min
+
+        sorted_entries: list[reader.types.Entry] = sorted(
+            entries, key=_sort_key, reverse=True
+        )
+        to_delete = sorted_entries[n:]
+        log.info(
+            "pruning %d entries from feed %s (keeping %d)",
+            len(to_delete),
+            feed.id,
+            n,
+        )
+        entry_ids: list[tuple[str, str]] = [(feed.id, e.id) for e in to_delete]
+        self.reader._storage.delete_entries(entry_ids, added_by=None)
+        return len(to_delete)
+
     def get_unread_count(self, feed: Feed) -> int:
         """Return the number of unread entries in a feed.
 
