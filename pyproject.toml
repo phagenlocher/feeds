@@ -65,20 +65,4 @@ extend-select = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.basedpyright]
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportMissingTypeStubs = false
-reportExplicitAny = false
-reportAny = false
-reportUnknownParameterType = false
-reportUnknownArgumentType = false
-reportUnknownLambdaType = false
-extraPaths = ["."]
 
-[[tool.basedpyright.executionEnvironments]]
-root = "feeds"
-reportUnusedCallResult = "none"
-reportImplicitOverride = "none"
-reportUnreachable = "none"
-reportUnnecessaryComparison = "none"

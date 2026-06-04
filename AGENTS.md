@@ -13,7 +13,7 @@
 ## Conventions
 - Python ≥3.10, PySide6, reader lib
 - Ruff with all the rules in pyproject.toml
-- basedpyright for type checking (lenient config)
+
 - No `__init__.py` re-exports: import from canonical module paths
 - @dataclass(frozen=True, slots=True) for data models
 - CamelCase for Qt subclasses, snake_case for everything else
