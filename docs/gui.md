@@ -5,7 +5,8 @@ built entirely programmatically; no `.ui` files or QSS stylesheets.
 
 ```
 FeedsApp (QMainWindow)                [feeds/app.py:18]
-├── Menu Bar: "Feed" menu with "Add Feed" | "Update Feeds"
+├── Menu Bar: "Feed" menu with "Add Feed" | "Update Feeds" | "Export URLs" | "Import URLs"
+├── Menu Bar: "Display" menu with "Show Searchbar" | "Zoom In" | "Zoom Out" | "Reset Zoom"
 ├── FeedTreePane                      [feeds/ui/panes.py:54]
 │   ├── SearchBar (QLineEdit)
 │   └── FeedTreeWidget (QTreeWidget)
@@ -40,6 +41,13 @@ instantiates `FeedsApp`, and enters the Qt event loop.
 - **Menu bar** (line 56): "Feed" menu with "Add Feed" action (triggers
   discovery flow) and "Update Feeds" action (triggers background update
   of all feeds).
+- **Display menu** (line 82): "Show Searchbar" checkable action
+  (`Ctrl+F`) toggles the fuzzy search bar (see §10). "Zoom In"
+  (`Ctrl++`), "Zoom Out" (`Ctrl+-`), and "Reset Zoom" (`Ctrl+0`)
+  control the application font size.
+- **Font zoom** (line 93): Applies globally via
+  `QApplication.setFont()` and propagates to the tree widget's
+  item heights. Default is 12pt, clamped to minimum 6pt.
 - **FeedTreePane** (line 69): Single central widget containing a
 - **Busy state** (line 113): Disables the "Update" menu action during
   background operations and shows "Updating…" text.
@@ -255,6 +263,9 @@ powered by **rapidfuzz** (`fuzz.partial_ratio`).
 | Key | Action |
 |-----|--------|
 | `Ctrl+F` | Toggle the search bar (show/hide). When shown, it is focused and existing text is selected. |
+| `Ctrl++` / `Ctrl+=` | Zoom in: increase the application font size by 1pt. |
+| `Ctrl+-` | Zoom out: decrease the application font size by 1pt (min 6pt). |
+| `Ctrl+0` | Reset zoom to the default font size (12pt). |
 | `Escape` | Clear the search bar, hide it, and return focus to the tree. |
 
 ### Fuzzy matching

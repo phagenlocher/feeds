@@ -30,6 +30,10 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._service: FeedService | None = None
         self._font_size: int = 12
         self._update_action: QtGui.QAction | None = None
+        self._searchbar_action: QtGui.QAction | None = None
+        self._zoom_in_action: QtGui.QAction | None = None
+        self._zoom_out_action: QtGui.QAction | None = None
+        self._zoom_reset_action: QtGui.QAction | None = None
         self.pane: FeedTreePane
 
         self.setWindowTitle("Feeds")
@@ -78,6 +82,32 @@ class FeedsApp(QtWidgets.QMainWindow):
         import_action.triggered.connect(self._on_import_urls)
         feed_menu.addAction(import_action)
 
+        display_menu = menubar.addMenu("&Display")
+
+        self._searchbar_action = QtGui.QAction("Show &Searchbar", self)
+        self._searchbar_action.setCheckable(True)
+        self._searchbar_action.setChecked(False)
+        self._searchbar_action.setShortcut(QtGui.QKeySequence("Ctrl+F"))
+        self._searchbar_action.triggered.connect(self._toggle_search)
+        display_menu.addAction(self._searchbar_action)
+
+        display_menu.addSeparator()
+
+        self._zoom_in_action = QtGui.QAction("Zoom &In", self)
+        self._zoom_in_action.setShortcut(QtGui.QKeySequence("Ctrl++"))
+        self._zoom_in_action.triggered.connect(self._zoom_in)
+        display_menu.addAction(self._zoom_in_action)
+
+        self._zoom_out_action = QtGui.QAction("Zoom &Out", self)
+        self._zoom_out_action.setShortcut(QtGui.QKeySequence("Ctrl+-"))
+        self._zoom_out_action.triggered.connect(self._zoom_out)
+        display_menu.addAction(self._zoom_out_action)
+
+        self._zoom_reset_action = QtGui.QAction("&Reset Zoom", self)
+        self._zoom_reset_action.setShortcut(QtGui.QKeySequence("Ctrl+0"))
+        self._zoom_reset_action.triggered.connect(self._zoom_reset)
+        display_menu.addAction(self._zoom_reset_action)
+
         help_menu = menubar.addMenu("&Help")
         report_action = QtGui.QAction("&Report Issue", self)
         report_action.triggered.connect(self._on_report_issue)
@@ -106,11 +136,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         QtWidgets.QApplication.instance().setFont(font)
 
     def _setup_zoom_shortcuts(self) -> None:
-        QtGui.QShortcut(QtGui.QKeySequence("Ctrl++"), self, self._zoom_in)
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+="), self, self._zoom_in)
-        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+-"), self, self._zoom_out)
-        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+0"), self, self._zoom_reset)
-        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+F"), self, self._toggle_search)
 
     def _zoom_in(self) -> None:
         self._font_size += 1
@@ -126,6 +152,8 @@ class FeedsApp(QtWidgets.QMainWindow):
 
     def _toggle_search(self) -> None:
         self.pane.toggle_search()
+        if self._searchbar_action is not None:
+            self._searchbar_action.setChecked(self.pane.search_bar.isVisible())
 
     def _apply_font_size(self) -> None:
         self._set_base_font()
