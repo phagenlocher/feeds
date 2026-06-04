@@ -129,6 +129,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self.pane.rename_feed_requested.connect(self._rename_feed)
         self.pane.update_feed_requested.connect(self._update_single_feed)
         self.pane.prune_feed_requested.connect(self._prune_feed_async)
+        self.pane.search_visibility_changed.connect(self._on_search_visibility_changed)
         self.setCentralWidget(self.pane)
 
     def _set_base_font(self) -> None:
@@ -153,8 +154,10 @@ class FeedsApp(QtWidgets.QMainWindow):
 
     def _toggle_search(self) -> None:
         self.pane.toggle_search()
+
+    def _on_search_visibility_changed(self, visible: bool) -> None:
         if self._searchbar_action is not None:
-            self._searchbar_action.setChecked(self.pane.search_bar.isVisible())
+            self._searchbar_action.setChecked(visible)
 
     def _apply_font_size(self) -> None:
         self._set_base_font()

@@ -66,6 +66,7 @@ class FeedTreePane(QtWidgets.QWidget):
     rename_feed_requested: QtCore.Signal = QtCore.Signal(int)
     update_feed_requested: QtCore.Signal = QtCore.Signal(int)
     prune_feed_requested: QtCore.Signal = QtCore.Signal(int, int)
+    search_visibility_changed: QtCore.Signal = QtCore.Signal(bool)
 
     def __init__(
         self,
@@ -494,9 +495,11 @@ class FeedTreePane(QtWidgets.QWidget):
             self.search_bar.setVisible(True)
             self.search_bar.setFocus()
             self.search_bar.selectAll()
+            self.search_visibility_changed.emit(True)
 
     def _on_filter_escape(self) -> None:
         if self.search_bar.text():
             self.search_bar.clear()
         self.search_bar.setVisible(False)
         self.tree.setFocus()
+        self.search_visibility_changed.emit(False)
