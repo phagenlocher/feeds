@@ -140,7 +140,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "nuitka" },
     { name = "ruff" },
 ]
 
@@ -155,10 +154,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "nuitka", specifier = ">=4.1.1" },
-    { name = "ruff" },
-]
+dev = [{ name = "ruff" }]
 
 [[package]]
 name = "idna"
@@ -242,12 +238,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1a/8a/0402ba61a2f16038b48b39bccca271134be00c5c9f0f623208399333c448/markupsafe-3.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4faffd047e07c38848ce017e8725090413cd80cbc23d86e55c587bf979e579c9", size = 15426 },
     { url = "https://files.pythonhosted.org/packages/70/bc/6f1c2f612465f5fa89b95bead1f44dcb607670fd42891d8fdcd5d039f4f4/markupsafe-3.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:32001d6a8fc98c8cb5c947787c5d08b0a50663d139f1305bac5885d98d9b40fa", size = 14146 },
 ]
-
-[[package]]
-name = "nuitka"
-version = "4.1.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d2/a6/8cf2a663402c057005f0328bdc691a653fa14848248358ef051f86a21880/nuitka-4.1.1.tar.gz", hash = "sha256:777e2c84d6b168f9bf78c3242b3779958865ae5815d26c76170eb830995368cc", size = 4558061 }
 
 [[package]]
 name = "pyside6"

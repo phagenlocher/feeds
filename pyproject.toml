@@ -16,7 +16,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ruff",
-    "nuitka>=4.1.1",
 ]
 
 [tool.ruff.lint]
