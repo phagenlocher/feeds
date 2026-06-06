@@ -17,6 +17,7 @@ build: _static-venv
       --output-dir=dist \
       --deployment \
       --python-flag=-m \
+      --lto=yes \
       feeds
     rm -rf dist/*.build dist/*.dist dist/*.onefile-build
 
