@@ -83,7 +83,7 @@ class _FeedLinkFinder(HTMLParser):
             return
 
         rel = attrs_dict.get("rel", "").strip()
-        link_type = attrs_dict.get("type", "")
+        link_type = attrs_dict.get("type", "").lower()
         href = attrs_dict.get("href", "")
         if href and "alternate" in rel.split() and link_type in FEED_MIME_TYPES:
             title = attrs_dict.get("title", href)
