@@ -58,7 +58,6 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._build_menu_bar()
         self._build_main_area(delegate)
 
-        self._startup_reader: bool = False
         QtCore.QTimer.singleShot(0, self._deferred_startup)
 
     def _deferred_startup(self) -> None:
@@ -171,9 +170,6 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._settings_path.write_text(
             json.dumps({"font_size": self._font_size}, indent=2)
         )
-
-    def _setup_zoom_shortcuts(self) -> None:
-        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+="), self, self._zoom_in)
 
     def _zoom_in(self) -> None:
         self._font_size += 1
