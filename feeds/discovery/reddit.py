@@ -51,7 +51,7 @@ def try_reddit(url: str) -> list[tuple[str, str]]:
     log.debug("checking Reddit path: %s", path)
 
     # /r/SUBREDDIT — extract subreddit name from the path.
-    m: re.Match[str] | None = re.match(r"/r/([\w]+)", path)
+    m: re.Match[str] | None = re.match(r"/r/([\w-]+)", path)
     if m:
         log.info("detected Reddit subreddit: r/%s", m.group(1))
         return validate_feed(f"https://www.reddit.com/r/{m.group(1)}/.rss")
