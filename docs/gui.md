@@ -6,7 +6,7 @@ built entirely programmatically; no `.ui` files or QSS stylesheets.
 ```
 FeedsApp (QMainWindow)                [feeds/app.py:27]
 ├── Menu Bar: "Feed" menu with "Add Feed" | "Update Feeds" | "Export Feeds" (OPML) | "Import Feeds" (OPML)
-├── Menu Bar: "Display" menu with "Show Searchbar" | "Zoom In" | "Zoom Out" | "Reset Zoom"
+├── Menu Bar: "Display" menu with "Show Searchbar" | "Show Tag Filter" | "Manage Tags" | "Zoom In" | "Zoom Out" | "Reset Zoom"
 ├── FeedTreePane                      [feeds/ui/panes.py:58]
 │   ├── SearchBar (QLineEdit)
 │   └── FeedTreeWidget (QTreeWidget)
@@ -42,9 +42,11 @@ instantiates `FeedsApp`, and enters the Qt event loop.
   discovery flow) and "Update Feeds" action (triggers background update
   of all feeds).
 - **Display menu** (line 105): "Show Searchbar" checkable action
-  (`Ctrl+F`) toggles the fuzzy search bar (see §10). "Zoom In"
-  (`Ctrl++`), "Zoom Out" (`Ctrl+-`), and "Reset Zoom" (`Ctrl+0`)
-  control the application font size.
+   (`Ctrl+F`) toggles the fuzzy search bar (see §10).
+   "Show Tag Filter" checkable action (`Ctrl+T`) toggles the tag
+   filter combo (see §10). "Zoom In" (`Ctrl++`), "Zoom Out"
+   (`Ctrl+-`), and "Reset Zoom" (`Ctrl+0`) control the application
+   font size.
 - **Font zoom** (line 196): Applies globally via
   `QApplication.setFont()` and propagates to the tree widget's
   item heights. Default is 12pt, clamped to minimum 6pt.
@@ -67,6 +69,7 @@ instantiates `FeedsApp`, and enters the Qt event loop.
 | `FeedTreePane.update_feed_requested(int)` | `_update_single_feed` (line 434) | Manually updates a single feed |
 | `FeedTreePane.prune_feed_requested(int, int)` | `_prune_feed_async` (line 536) | Prunes old entries from a feed |
 | `FeedTreePane.search_visibility_changed(bool)` | `_on_search_visibility_changed` (line 192) | Keeps searchbar action checked state in sync |
+| `FeedTreePane.tag_filter_visibility_changed(bool)` | `_on_tag_filter_visibility_changed` | Keeps tag filter action checked state in sync |
 
 ### Async flow
 
@@ -100,6 +103,7 @@ where:
 | `update_feed_requested` | `int` (feed row) | "Update feed" context menu |
 | `prune_feed_requested` | `int, int` (feed row, n) | "Prune entries" context menu |
 | `search_visibility_changed` | `bool` | Search bar shown/hidden |
+| `tag_filter_visibility_changed` | `bool` | Tag filter combo shown/hidden |
 
 ### Display: feed items
 
@@ -263,19 +267,30 @@ When a tree entry is activated (double-clicked):
 
 ## 10. Search / Filter
 
+### Entry search
+
 A `QLineEdit` search bar sits above the tree widget in `FeedTreePane`,
 hidden by default.  It provides fuzzy filtering of entries by title,
 powered by **rapidfuzz** (`fuzz.partial_ratio`).
+
+### Tag filter
+
+A `QComboBox` tag filter sits below the search bar, hidden by default.
+It provides filtering of top-level feeds by tag via the ``reader``
+library's native OR filter (`reader.get_feeds(tags=[tag])`).  The
+combo lists "All tags" (default), "Untagged", and each defined tag.
 
 ### Keyboard shortcuts
 
 | Key | Action |
 |-----|--------|
 | `Ctrl+F` | Toggle the search bar (show/hide). When shown, it is focused and existing text is selected. |
+| `Ctrl+T` | Toggle the tag filter (show/hide). When hidden, the filter is reset to "All tags". |
 | `Ctrl++` / `Ctrl+=` | Zoom in: increase the application font size by 1pt. |
 | `Ctrl+-` | Zoom out: decrease the application font size by 1pt (min 6pt). |
 | `Ctrl+0` | Reset zoom to the default font size (12pt). |
-| `Escape` | Clear the search bar, hide it, and return focus to the tree. |
+| `Escape` (in search bar) | Clear the search bar, hide it, and return focus to the tree. |
+| `Escape` (in tag filter) | Reset the tag filter to "All tags", hide it, and return focus to the tree. |
 
 ### Fuzzy matching
 
