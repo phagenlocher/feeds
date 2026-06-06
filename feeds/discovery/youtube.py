@@ -136,7 +136,7 @@ def _resolve_channel_id(channel_url: str) -> str | None:
         if browse_id and browse_id.startswith("UC"):
             log.debug("resolved channel ID: %s", browse_id)
             return browse_id
-    except Exception:
+    except (requests.RequestException, ValueError):
         log.debug("Failed to resolve channel URL: %s", channel_url)
     return None
 
@@ -178,6 +178,6 @@ def _feed_from_video_id(video_id: str) -> list[tuple[str, str]]:
             return validate_feed(
                 f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
             )
-    except Exception:
+    except requests.RequestException:
         log.debug("Failed to resolve YouTube video %s via oEmbed", video_id)
     return []

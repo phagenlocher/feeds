@@ -35,6 +35,4 @@ def validate_feed(feed_url: str) -> list[tuple[str, str]]:
             return [(resp.url, title or feed_url)]
     except requests.RequestException:
         log.debug("Feed %s is not valid (HTTP error)", feed_url)
-    except Exception:
-        log.debug("Feed %s is not valid (parse error)", feed_url)
     return []
