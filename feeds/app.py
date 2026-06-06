@@ -50,6 +50,7 @@ class FeedsApp(QtWidgets.QMainWindow):
 
     def _deferred_startup(self) -> None:
         """Initialize FeedReader and build feed tree after UI is visible."""
+        self._apply_font_size()
         try:
             self.reader = FeedReader()
             self._service = FeedService(self.reader)
