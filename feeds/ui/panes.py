@@ -77,6 +77,7 @@ class FeedTreePane(QtWidgets.QWidget):
         super().__init__(parent)
         self.feeds: list[Feed] = []
         self._filter_text: str = ""
+        self._debounce_timer: QtCore.QTimer
         self.tree: FeedTreeWidget
         self.search_bar: QtWidgets.QLineEdit
 
@@ -90,6 +91,11 @@ class FeedTreePane(QtWidgets.QWidget):
         self.search_bar.setClearButtonEnabled(True)
         self.search_bar.textChanged.connect(self._on_filter_changed)
         layout.addWidget(self.search_bar)
+
+        self._debounce_timer = QtCore.QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.setInterval(300)
+        self._debounce_timer.timeout.connect(self._apply_filter)
 
         escape_shortcut = QtGui.QShortcut(
             QtGui.QKeySequence(QtCore.Qt.Key.Key_Escape), self.search_bar
@@ -148,7 +154,7 @@ class FeedTreePane(QtWidgets.QWidget):
                             selected_feed_url = parent_feed.id
                             selected_entry_id = sel_entry.entry_id
                 case _:
-                    log.warning(f"Unknown item type: {item_type}")
+                    log.warning("Unknown item type: %s", item_type)
 
         scroll_pos: int = self.tree.verticalScrollBar().value()
 
@@ -225,12 +231,12 @@ class FeedTreePane(QtWidgets.QWidget):
 
     def mark_entry_read(self, item: QtWidgets.QTreeWidgetItem) -> None:
         """Remove bold from the item and decrement the parent feed's unread count."""
-        self._set_item_bold(item, False)
+        self._set_item_bold(item, bold=False)
         self._update_parent_unread(item.parent(), -1)
 
     def mark_entry_unread(self, item: QtWidgets.QTreeWidgetItem) -> None:
         """Apply bold to the item and increment the parent feed's unread count."""
-        self._set_item_bold(item, True)
+        self._set_item_bold(item, bold=True)
         self._update_parent_unread(item.parent(), 1)
 
     def _build_feed_item(
@@ -267,7 +273,7 @@ class FeedTreePane(QtWidgets.QWidget):
         return item
 
     @staticmethod
-    def _set_item_bold(item: QtWidgets.QTreeWidgetItem, bold: bool) -> None:
+    def _set_item_bold(item: QtWidgets.QTreeWidgetItem, *, bold: bool) -> None:
         font = item.font(0)
         font.setBold(bold)
         item.setFont(0, font)
@@ -455,7 +461,7 @@ class FeedTreePane(QtWidgets.QWidget):
 
     def _on_filter_changed(self, text: str) -> None:
         self._filter_text = text
-        self._apply_filter()
+        self._debounce_timer.start()
 
     def _apply_filter(self) -> None:
         query = self._filter_text.lower()
