@@ -513,22 +513,19 @@ class FeedReader:
 
     def get_posts(self, feed: Feed) -> Iterator[Entry]:
         """Return entries sorted by recency using SQL-level sorting."""
-        return [
-            Entry(
-                feed=feed.id,
-                id=entry.id,
-                title=entry.title,
-                link=entry.link,
-                published=entry.published,
-                updated=entry.updated,
+        for entry in self.reader.get_entries(
+            feed=feed.id,
+            sort=EntrySort.RECENT,
+        ):
+            yield Entry(
+                url=entry.link or "",
+                title=entry.title or "No Title",
+                last_updated=entry.updated or entry.published,
+                entry_id=entry.id,
+                feed_id=feed.id,
                 read=entry.read,
-                last_updated=entry.last_updated,
+                author=entry.authors_str or "",
             )
-            for entry in self.reader.get_entries(
-                feed=feed.id,
-                sort=EntrySort.RECENT,
-            )
-        ]
 
     def mark_entry_as_read(self, entry: Entry) -> None:
         """Mark a single entry as read.
