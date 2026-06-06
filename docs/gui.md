@@ -5,7 +5,7 @@ built entirely programmatically; no `.ui` files or QSS stylesheets.
 
 ```
 FeedsApp (QMainWindow)                [feeds/app.py:18]
-├── Menu Bar: "Feed" menu with "Add Feed" | "Update Feeds" | "Export URLs" | "Import URLs"
+├── Menu Bar: "Feed" menu with "Add Feed" | "Update Feeds" | "Export Feeds" (OPML) | "Import Feeds" (OPML)
 ├── Menu Bar: "Display" menu with "Show Searchbar" | "Zoom In" | "Zoom Out" | "Reset Zoom"
 ├── FeedTreePane                      [feeds/ui/panes.py:54]
 │   ├── SearchBar (QLineEdit)
