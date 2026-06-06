@@ -1,8 +1,11 @@
 """Main window orchestrating menu bar, tree pane, zoom, and async operations."""
 
+import json
 import logging
+import os
 import webbrowser
 from collections.abc import Callable
+from pathlib import Path
 
 import reader
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -33,6 +36,13 @@ class FeedsApp(QtWidgets.QMainWindow):
             QtWidgets.QApplication.instance().font().pointSize()
         )
         self._font_size: int = self._default_font_size
+        self._settings_path: Path = (
+            Path(
+                os.environ.get("FEEDS_DB_PATH")
+                or Path("~/.feeds/feeds.db").expanduser()
+            ).parent
+            / "settings.json"
+        )
         self._update_action: QtGui.QAction | None = None
         self._searchbar_action: QtGui.QAction | None = None
         self._zoom_in_action: QtGui.QAction | None = None
@@ -53,6 +63,7 @@ class FeedsApp(QtWidgets.QMainWindow):
 
     def _deferred_startup(self) -> None:
         """Initialize FeedReader and build feed tree after UI is visible."""
+        self._load_settings()
         self._apply_font_size()
         try:
             self.reader = FeedReader()
@@ -146,20 +157,38 @@ class FeedsApp(QtWidgets.QMainWindow):
         font.setPointSize(self._font_size)
         QtWidgets.QApplication.instance().setFont(font)
 
+    def _load_settings(self) -> None:
+        try:
+            data: dict[str, object] = json.loads(self._settings_path.read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            return
+        saved = data.get("font_size")
+        if isinstance(saved, int) and saved >= 6:
+            self._font_size = saved
+
+    def _save_settings(self) -> None:
+        self._settings_path.parent.mkdir(parents=True, exist_ok=True)
+        self._settings_path.write_text(
+            json.dumps({"font_size": self._font_size}, indent=2)
+        )
+
     def _setup_zoom_shortcuts(self) -> None:
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+="), self, self._zoom_in)
 
     def _zoom_in(self) -> None:
         self._font_size += 1
         self._apply_font_size()
+        self._save_settings()
 
     def _zoom_out(self) -> None:
         self._font_size = max(6, self._font_size - 1)
         self._apply_font_size()
+        self._save_settings()
 
     def _zoom_reset(self) -> None:
         self._font_size = self._default_font_size
         self._apply_font_size()
+        self._save_settings()
 
     def _toggle_search(self) -> None:
         self.pane.toggle_search()
