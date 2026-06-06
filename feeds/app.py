@@ -4,7 +4,8 @@ import logging
 import webbrowser
 from collections.abc import Callable
 
-from PySide6 import QtGui, QtWidgets
+import reader
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from feeds.models.feed import Entry, FeedReader
 from feeds.services.feed_service import FeedService
@@ -44,21 +45,25 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._build_menu_bar()
         self._build_main_area(delegate)
 
+        self._startup_reader: bool = False
+        QtCore.QTimer.singleShot(0, self._deferred_startup)
+
+    def _deferred_startup(self) -> None:
+        """Initialize FeedReader and build feed tree after UI is visible."""
         try:
-            self.reader = reader or FeedReader()
+            self.reader = FeedReader()
             self._service = FeedService(self.reader)
-        except Exception:
+        except OSError:
             log.exception("failed to initialize FeedReader")
             self.statusBar().showMessage("Failed to open feed database", 0)
-        else:
-            self._apply_font_size()
-            self._setup_zoom_shortcuts()
-            try:
-                self.pane.refresh(self.reader)
-            except Exception:
-                log.exception("failed to load feeds")
-                self.statusBar().showMessage("Failed to load feeds from database", 0)
-            self._update_all_feeds(scheduled=True)
+            return
+        try:
+            self.pane.refresh(self.reader)
+        except (OSError, reader.ReaderError):
+            log.exception("failed to load feeds")
+            self.statusBar().showMessage("Failed to load feeds from database", 0)
+            return
+        self._update_all_feeds(scheduled=True)
 
     def _build_menu_bar(self) -> None:
         menubar = self.menuBar()
@@ -163,7 +168,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._set_base_font()
         self.pane.tree.set_font_size(self._font_size)
 
-    def _set_busy(self, busy: bool) -> None:
+    def _set_busy(self, *, busy: bool) -> None:
         if self._update_action is None:
             return
         self._update_action.setEnabled(not busy)
@@ -173,10 +178,10 @@ class FeedsApp(QtWidgets.QMainWindow):
 
     def _on_service_error(self, msg: str) -> None:
         log.error("Service error: %s", msg)
-        self._set_busy(False)
+        self._set_busy(busy=False)
         self.statusBar().showMessage(f"Error: {msg}", 5000)
 
-    def _toggle_entry_read(self, entry: Entry, read: bool) -> None:
+    def _toggle_entry_read(self, entry: Entry, *, read: bool) -> None:
         if self.reader is None:
             return
         if read:
@@ -188,13 +193,13 @@ class FeedsApp(QtWidgets.QMainWindow):
 
     def _on_entry_activated(self, entry: Entry) -> None:
         log.info("entry activated: %s", entry.url)
-        self._toggle_entry_read(entry, True)
+        self._toggle_entry_read(entry, read=True)
 
     def _on_entry_read(self, entry: Entry) -> None:
-        self._toggle_entry_read(entry, True)
+        self._toggle_entry_read(entry, read=True)
 
     def _on_entry_unread(self, entry: Entry) -> None:
-        self._toggle_entry_read(entry, False)
+        self._toggle_entry_read(entry, read=False)
 
     def _on_add_feed(self) -> None:
         if self._service is None:
@@ -225,18 +230,18 @@ class FeedsApp(QtWidgets.QMainWindow):
             choice = AddFeedChoiceDialog(feeds, self)
             if choice.exec() != QtWidgets.QDialog.DialogCode.Accepted:
                 log.info("feed choice cancelled by user")
-                self._set_busy(False)
+                self._set_busy(busy=False)
                 return
 
             selected = choice.selected_feeds
             if not selected:
-                self._set_busy(False)
+                self._set_busy(busy=False)
                 return
 
             self._add_feeds_sequentially(selected, 0)
 
         self.statusBar().showMessage("Discovering feeds\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         self._service.discover_feeds(
             url, on_done=on_discovered, on_error=self._on_service_error
         )
@@ -248,7 +253,7 @@ class FeedsApp(QtWidgets.QMainWindow):
 
         def on_added() -> None:
             self.statusBar().showMessage("Updating feed\u2026")
-            self._set_busy(True)
+            self._set_busy(busy=True)
             _service.update_feed(
                 feed_url,
                 on_done=lambda: self._on_add_feed_done(feed_url),
@@ -256,14 +261,14 @@ class FeedsApp(QtWidgets.QMainWindow):
             )
 
         self.statusBar().showMessage("Adding feed\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         _service.add_feed(feed_url, on_done=on_added, on_error=self._on_service_error)
 
     def _add_feeds_sequentially(self, feeds: list[tuple[str, str]], index: int) -> None:
         if index >= len(feeds):
             if self.reader is None:
                 return
-            self._set_busy(False)
+            self._set_busy(busy=False)
             self.pane.refresh(self.reader)
             self.statusBar().showMessage("Feeds added", 3000)
             return
@@ -277,7 +282,7 @@ class FeedsApp(QtWidgets.QMainWindow):
 
         def on_added() -> None:
             self.statusBar().showMessage(f"Updating feed {index + 1}/{total}\u2026")
-            self._set_busy(True)
+            self._set_busy(busy=True)
             _service.update_feed(
                 feed_url,
                 on_done=lambda: self._on_add_feed_done(
@@ -288,7 +293,7 @@ class FeedsApp(QtWidgets.QMainWindow):
             )
 
         self.statusBar().showMessage(f"Adding feed {index + 1}/{total}\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         _service.add_feed(feed_url, on_done=on_added, on_error=self._on_service_error)
 
     def _on_add_feed_done(
@@ -306,12 +311,12 @@ class FeedsApp(QtWidgets.QMainWindow):
         if on_next:
             on_next()
         else:
-            self._set_busy(False)
+            self._set_busy(busy=False)
             self.statusBar().showMessage("Feed added", 3000)
 
     def _on_export_urls(self) -> None:
         """Open save dialog to export all feeds as an OPML subscription list."""
-        if self.reader is None:
+        if self._service is None:
             return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, "Export Feeds", "", "OPML files (*.opml)"
@@ -320,35 +325,42 @@ class FeedsApp(QtWidgets.QMainWindow):
             return
         if not path.endswith(".opml"):
             path += ".opml"
-        try:
-            export = self.reader.reader.export_feeds()
-            with open(path, "wb") as f:
-                f.write(export.content)
-            log.info("exported feeds to %s", path)
-            self.statusBar().showMessage(f"Exported feeds to {path}", 3000)
-        except Exception:
-            log.exception("failed to export feeds")
-            self.statusBar().showMessage("Failed to export feeds", 5000)
+        log.info("exporting feeds to %s", path)
+        self.statusBar().showMessage("Exporting feeds\u2026")
+        self._set_busy(busy=True)
+        self._service.export_feeds(
+            path,
+            on_done=lambda: self._on_export_feeds_done(path),
+            on_error=self._on_service_error,
+        )
+
+    def _on_export_feeds_done(self, path: str) -> None:
+        log.info("exported feeds to %s", path)
+        self._set_busy(busy=False)
+        self.statusBar().showMessage(f"Exported feeds to {path}", 3000)
 
     def _on_import_urls(self) -> None:
         """Open file dialog to import feeds from an OPML subscription list."""
-        if self._service is None or self.reader is None:
+        if self._service is None:
             return
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Import Feeds", "", "OPML files (*.opml)"
         )
         if not path:
             return
-        try:
-            with open(path, "rb") as f:
-                self.reader.reader.import_feeds(f)
-        except Exception:
-            log.exception("failed to import OPML file")
-            self.statusBar().showMessage("Failed to import OPML file", 5000)
-            return
-        log.info("imported feeds from %s, updating now", path)
+        log.info("importing feeds from %s", path)
         self.statusBar().showMessage("Importing feeds\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
+        self._service.import_feeds(
+            path,
+            on_done=self._on_import_feeds_done,
+            on_error=self._on_service_error,
+        )
+
+    def _on_import_feeds_done(self) -> None:
+        log.info("imported feeds from OPML file, updating now")
+        self.statusBar().showMessage("Importing feeds\u2026")
+        self._set_busy(busy=True)
         self._service.update_feeds(
             scheduled=False,
             on_done=self._on_update_feeds_done,
@@ -361,7 +373,7 @@ class FeedsApp(QtWidgets.QMainWindow):
             return
         log.info("updating all feeds (scheduled=%s)", scheduled)
         self.statusBar().showMessage("Updating feeds\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         self._service.update_feeds(
             scheduled=scheduled,
             on_done=self._on_update_feeds_done,
@@ -376,7 +388,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         if self.reader is None:
             return
         log.info("feeds updated")
-        self._set_busy(False)
+        self._set_busy(busy=False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage("Feeds updated", 3000)
 
@@ -398,7 +410,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         feed = self.pane.feeds[feed_index]
         log.info("update single feed requested: %s", feed.id)
         self.statusBar().showMessage(f"Updating {feed.title}\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         self._service.update_feed(
             feed.id,
             on_done=self._on_update_single_feed_done,
@@ -409,7 +421,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         if self.reader is None:
             return
         log.info("single feed updated")
-        self._set_busy(False)
+        self._set_busy(busy=False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage("Feed updated", 3000)
 
@@ -421,7 +433,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         feed = self.pane.feeds[feed_index]
         log.info("removing feed: %s", feed.id)
         self.statusBar().showMessage(f"Removing {feed.title}\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         self._service.delete_feed(
             feed,
             on_done=self._on_remove_feed_done,
@@ -432,7 +444,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         if self.reader is None:
             return
         log.info("feed removed")
-        self._set_busy(False)
+        self._set_busy(busy=False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage("Feed removed", 3000)
 
@@ -453,7 +465,7 @@ class FeedsApp(QtWidgets.QMainWindow):
 
         log.info("renaming feed %s to '%s'", feed.id, title)
         self.statusBar().showMessage(f"Renaming {feed.title}\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         self._service.set_feed_user_title(
             feed,
             title,
@@ -465,7 +477,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         if self.reader is None:
             return
         log.info("feed renamed")
-        self._set_busy(False)
+        self._set_busy(busy=False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage("Feed renamed", 3000)
 
@@ -477,7 +489,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         feed = self.pane.feeds[feed_index]
         log.info("marking all as read in feed: %s", feed.id)
         self.statusBar().showMessage("Marking all as read\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         self._service.mark_all_as_read(
             feed,
             on_done=self._on_read_all_done,
@@ -488,7 +500,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         if self.reader is None:
             return
         log.info("all entries marked as read")
-        self._set_busy(False)
+        self._set_busy(busy=False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage("All marked as read", 3000)
 
@@ -500,7 +512,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         feed = self.pane.feeds[feed_index]
         log.info("pruning feed to %d entries: %s", n, feed.id)
         self.statusBar().showMessage(f"Pruning {feed.title}\u2026")
-        self._set_busy(True)
+        self._set_busy(busy=True)
         self._service.prune_feed(
             feed,
             n,
@@ -512,6 +524,6 @@ class FeedsApp(QtWidgets.QMainWindow):
         if self.reader is None:
             return
         log.info("feed pruned: %s", feed_title)
-        self._set_busy(False)
+        self._set_busy(busy=False)
         self.pane.refresh(self.reader)
         self.statusBar().showMessage(f"{feed_title} pruned", 3000)
