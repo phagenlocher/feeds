@@ -11,7 +11,7 @@
 Agents may not use any other just commands.
 
 ## Conventions
-- Python ≥3.10, PySide6, reader lib
+- Python ≥3.11, PySide6, reader lib
 - Ruff with all the rules in pyproject.toml
 
 - No `__init__.py` re-exports: import from canonical module paths

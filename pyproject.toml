@@ -3,10 +3,11 @@ name = "feeds"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11"
 dependencies = [
     "reader>=3.24,<3.25",
-    "PySide6",
+    "PySide6>=6.6,<6.12",
+    "tenacity>=8.2",
     "requests>=2.31",
     "feedparser>=6.0",
     "rapidfuzz>=3.0",
@@ -64,5 +65,9 @@ extend-select = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
 
 
