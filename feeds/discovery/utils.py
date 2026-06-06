@@ -2,7 +2,8 @@
 
 import logging
 
-from reader._parser import default_parser
+import feedparser
+import requests
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -21,13 +22,19 @@ def validate_feed(feed_url: str) -> list[tuple[str, str]]:
         content, ``[]`` otherwise.
     """
     try:
-        parser = default_parser(session_timeout=_FEED_TIMEOUT)
-        parser.session_factory.user_agent = USER_AGENT
-        result = parser(feed_url)
-        if result is not None:
-            feed = result.feed
-            title = feed.title or ""
-            return [(feed_url, title or feed_url)]
+        resp: requests.Response = requests.get(
+            feed_url,
+            timeout=_FEED_TIMEOUT,
+            headers={"User-Agent": USER_AGENT},
+            allow_redirects=True,
+        )
+        resp.raise_for_status()
+        parsed: feedparser.FeedParserDict = feedparser.parse(resp.content)
+        if parsed.version:
+            title = parsed.feed.get("title", "")
+            return [(resp.url, title or feed_url)]
+    except requests.RequestException:
+        log.debug("Feed %s is not valid (HTTP error)", feed_url)
     except Exception:
-        log.debug("Feed %s is not valid", feed_url)
+        log.debug("Feed %s is not valid (parse error)", feed_url)
     return []
