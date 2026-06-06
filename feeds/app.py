@@ -29,7 +29,10 @@ class FeedsApp(QtWidgets.QMainWindow):
         super().__init__()
         self.reader: FeedReader | None = None
         self._service: FeedService | None = None
-        self._font_size: int = 12
+        self._default_font_size: int = (
+            QtWidgets.QApplication.instance().font().pointSize()
+        )
+        self._font_size: int = self._default_font_size
         self._update_action: QtGui.QAction | None = None
         self._searchbar_action: QtGui.QAction | None = None
         self._zoom_in_action: QtGui.QAction | None = None
@@ -139,7 +142,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self.setCentralWidget(self.pane)
 
     def _set_base_font(self) -> None:
-        font = QtGui.QFont()
+        font = QtWidgets.QApplication.instance().font()
         font.setPointSize(self._font_size)
         QtWidgets.QApplication.instance().setFont(font)
 
@@ -155,7 +158,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._apply_font_size()
 
     def _zoom_reset(self) -> None:
-        self._font_size = 12
+        self._font_size = self._default_font_size
         self._apply_font_size()
 
     def _toggle_search(self) -> None:

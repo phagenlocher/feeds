@@ -65,7 +65,11 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
     @staticmethod
     def _make_font(font_size: int, bold: bool = False) -> QtGui.QFont:
         font = QtGui.QFont()
-        font.setPointSize(font_size if font_size > 0 else 12)
+        font.setPointSize(
+            font_size
+            if font_size > 0
+            else QtWidgets.QApplication.instance().font().pointSize()
+        )
         font.setBold(bold)
         return font
 
@@ -81,7 +85,11 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
         item_type: ItemType | None = None,
     ) -> QtWidgets.QTreeWidgetItem:
         """Build QTreeWidgetItem with title, subtitle, bold, and size hint."""
-        size = self._font_size if self._font_size > 0 else 12
+        size = (
+            self._font_size
+            if self._font_size > 0
+            else QtWidgets.QApplication.instance().font().pointSize()
+        )
         item = QtWidgets.QTreeWidgetItem()
         item.setText(0, title)
         item.setSizeHint(0, QtCore.QSize(0, self._item_height(size, item_type)))
