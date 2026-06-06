@@ -26,7 +26,14 @@ from urllib.parse import urljoin, urlparse
 import feedparser
 import reader
 import requests
+from reader import EntrySort
 from requests.utils import parse_header_links
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from feeds.discovery.medium import try_medium
 from feeds.discovery.reddit import try_reddit
@@ -153,10 +160,7 @@ def _parse_link_header(header_value: str, base_url: str) -> list[tuple[str, str]
         List of ``(feed_url, title)`` tuples found in the header.
     """
     feeds: list[tuple[str, str]] = []
-    try:
-        links: list[dict[str, str]] = parse_header_links(header_value)
-    except Exception:
-        return feeds
+    links: list[dict[str, str]] = parse_header_links(header_value)
 
     for link in links:
         rel = link.get("rel", "").strip().lower()
@@ -208,7 +212,7 @@ def _try_common_paths(url: str) -> list[tuple[str, str]]:
             seen.add(feed_url)
 
             try:
-                resp: requests.Response = requests.get(
+                resp: requests.Response = _get_with_retry(
                     feed_url,
                     timeout=3,
                     headers={"User-Agent": USER_AGENT},
@@ -222,11 +226,28 @@ def _try_common_paths(url: str) -> list[tuple[str, str]]:
                     feeds.append((resp.url, title or feed_url))
             except requests.RequestException:
                 continue
-            except Exception:
+            except AttributeError:
                 log.warning("Failed to parse potential feed at %s", feed_url)
                 continue
 
     return feeds
+
+
+def _get_with_retry(
+    url: str,
+    timeout: int,
+    headers: dict[str, str] | None = None,
+    allow_redirects: bool = True,
+) -> requests.Response:
+    """GET with exponential backoff retry (3 attempts, min 1s delay)."""
+    return retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(requests.RequestException),
+        reraise=True,
+    )(requests.get)(
+        url, timeout=timeout, headers=headers, allow_redirects=allow_redirects
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -365,7 +386,7 @@ class FeedReader:
                 feeds.append((href, title))
 
         try:
-            resp: requests.Response = requests.get(
+            resp: requests.Response = _get_with_retry(
                 url,
                 timeout=10,
                 headers={"User-Agent": USER_AGENT},
@@ -393,20 +414,14 @@ class FeedReader:
         if is_html:
             log.debug("scanning HTML <link> tags for feed references")
             finder: _FeedLinkFinder = _FeedLinkFinder()
-            try:
-                finder.feed(resp.text)
-            except Exception:
-                log.warning("Failed to parse HTML from %s", url)
-            else:
-                base_url = (
-                    urljoin(resp.url, finder.base_href)
-                    if finder.base_href
-                    else resp.url
-                )
-                log.debug("found %d feed(s) via <link> tags", len(finder.feeds))
-                for href, title in finder.feeds:
-                    log.debug("  <link> feed: %s (%s)", href, title)
-                    _add(urljoin(base_url, href), title)
+            finder.feed(resp.text)
+            base_url = (
+                urljoin(resp.url, finder.base_href) if finder.base_href else resp.url
+            )
+            log.debug("found %d feed(s) via <link> tags", len(finder.feeds))
+            for href, title in finder.feeds:
+                log.debug("  <link> feed: %s (%s)", href, title)
+                _add(urljoin(base_url, href), title)
         else:
             log.debug("content type is %s, skipping HTML scan", content_type)
 
@@ -497,36 +512,23 @@ class FeedReader:
             )
 
     def get_posts(self, feed: Feed) -> Iterator[Entry]:
-        """Yield all entries (posts) belonging to a feed.
-
-        Entries without a ``link`` attribute are skipped with a
-        warning log.  Results are sorted by ``last_updated`` (newest
-        first); entries without a date sort last.
-
-        Args:
-            feed: The feed whose entries to retrieve.
-
-        Yields:
-            :class:`Entry` instances sorted by last_updated (newest first).
-        """
-        entries: list[Entry] = []
-        for e in self.reader.get_entries(feed=feed.id):
-            if not e.link:
-                log.warning("entry %s has no link, skipping", e.id)
-                continue
-            entries.append(
-                Entry(
-                    url=e.link,
-                    title=e.title or "No Title",
-                    last_updated=e.updated or e.published,
-                    entry_id=e.id,
-                    feed_id=feed.id,
-                    read=e.read,
-                    author=e.authors_str or "",
-                )
+        """Return entries sorted by recency using SQL-level sorting."""
+        return [
+            Entry(
+                feed=feed.id,
+                id=entry.id,
+                title=entry.title,
+                link=entry.link,
+                published=entry.published,
+                updated=entry.updated,
+                read=entry.read,
+                last_updated=entry.last_updated,
             )
-        entries.sort(key=lambda e: e.last_updated or datetime.min, reverse=True)
-        yield from entries
+            for entry in self.reader.get_entries(
+                feed=feed.id,
+                sort=EntrySort.RECENT,
+            )
+        ]
 
     def mark_entry_as_read(self, entry: Entry) -> None:
         """Mark a single entry as read.
