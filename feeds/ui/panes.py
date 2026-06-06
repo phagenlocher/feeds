@@ -16,11 +16,13 @@ from feeds.ui.widgets import (
     FeedTreeWidget,
     ItemType,
     ItemTypeRole,
+    TagsRole,
 )
 
 log: logging.Logger = logging.getLogger(__name__)
 
 _FUZZY_THRESHOLD: int = 80
+_UNTAGGED_MARKER: str = "__untagged__"
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +47,7 @@ class FeedMenuAction(IntEnum):
     READ_ALL = auto()
     REMOVE = auto()
     RENAME = auto()
+    TAG = auto()
     UPDATE = auto()
 
 
@@ -67,19 +70,26 @@ class FeedTreePane(QtWidgets.QWidget):
     update_feed_requested: QtCore.Signal = QtCore.Signal(int)
     prune_feed_requested: QtCore.Signal = QtCore.Signal(int, int)
     search_visibility_changed: QtCore.Signal = QtCore.Signal(bool)
+    tag_filter_visibility_changed: QtCore.Signal = QtCore.Signal(bool)
+    tag_feed_requested: QtCore.Signal = QtCore.Signal(int)
 
     def __init__(
         self,
         delegate: QtWidgets.QStyledItemDelegate,
+        tag_colors: dict[str, str] | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
         """Build the pane with a tree widget using the given delegate."""
         super().__init__(parent)
         self.feeds: list[Feed] = []
+        self._reader: FeedReader | None = None
+        self._tag_colors: dict[str, str] = tag_colors if tag_colors is not None else {}
+        self._active_tag_filter: str | None = None
         self._filter_text: str = ""
         self._debounce_timer: QtCore.QTimer
         self.tree: FeedTreeWidget
         self.search_bar: QtWidgets.QLineEdit
+        self.tag_combo: QtWidgets.QComboBox
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -91,6 +101,17 @@ class FeedTreePane(QtWidgets.QWidget):
         self.search_bar.setClearButtonEnabled(True)
         self.search_bar.textChanged.connect(self._on_filter_changed)
         layout.addWidget(self.search_bar)
+
+        self.tag_combo = QtWidgets.QComboBox(self)
+        self.tag_combo.setVisible(False)
+        self.tag_combo.currentIndexChanged.connect(self._on_tag_filter_changed)
+        layout.addWidget(self.tag_combo)
+        self._populate_tag_combo()
+
+        tag_escape = QtGui.QShortcut(
+            QtGui.QKeySequence(QtCore.Qt.Key.Key_Escape), self.tag_combo
+        )
+        tag_escape.activated.connect(self._on_tag_filter_escape)
 
         self._debounce_timer = QtCore.QTimer(self)
         self._debounce_timer.setSingleShot(True)
@@ -220,8 +241,16 @@ class FeedTreePane(QtWidgets.QWidget):
 
     def refresh(self, reader: FeedReader) -> None:
         """Clear and rebuild the tree from all feeds and entries."""
+        self._reader = reader
+        self._populate_tag_combo()
         prev_state: TreeViewState = self._save_state()
-        self.feeds = list(reader.get_feeds())
+        active = self._active_tag_filter
+        if active == _UNTAGGED_MARKER:
+            self.feeds = list(reader.get_feeds(tags=False))
+        elif active:
+            self.feeds = list(reader.get_feeds(tags=[active]))
+        else:
+            self.feeds = list(reader.get_feeds())
         self.tree.clear()
         for feed_idx, feed in enumerate(self.feeds):
             feed_item = self._build_feed_item(feed, feed_idx, reader)
@@ -252,6 +281,12 @@ class FeedTreePane(QtWidgets.QWidget):
         item.setData(0, ItemTypeRole, ItemType.FEED)
         item.setData(0, FeedIndexRole, feed_idx)
         item.setData(0, DataRole, feed)
+
+        tag_names: list[str] = reader.get_feed_tags(feed.id)
+        tag_data: list[tuple[str, str]] = [
+            (t, self._tag_colors.get(t, "")) for t in tag_names
+        ]
+        item.setData(0, TagsRole, tag_data)
 
         for entry in reader.get_posts(feed):
             entry_item = self._build_entry_item(entry, feed_idx)
@@ -362,6 +397,10 @@ class FeedTreePane(QtWidgets.QWidget):
         act = prune_menu.addAction("Choose number of entries\u2026")
         act.setData((FeedMenuAction.PRUNE, -1))
         menu.addSeparator()
+
+        act = menu.addAction("Tag feed\u2026")
+        act.setData(FeedMenuAction.TAG)
+
         act = menu.addAction("Rename")
         act.setData(FeedMenuAction.RENAME)
         act = menu.addAction("Copy URL")
@@ -423,6 +462,9 @@ class FeedTreePane(QtWidgets.QWidget):
             case FeedMenuAction.RENAME:
                 log.info("rename feed requested: %s", feed.id)
                 self.rename_feed_requested.emit(feed_index)
+            case FeedMenuAction.TAG:
+                log.info("tag feed requested: %s", feed.id)
+                self.tag_feed_requested.emit(feed_index)
             case FeedMenuAction.UPDATE:
                 log.info("update feed requested: %s", feed.id)
                 self.update_feed_requested.emit(feed_index)
@@ -460,6 +502,30 @@ class FeedTreePane(QtWidgets.QWidget):
                 self.entry_unread_requested.emit(entry)
             case _ as unreachable:
                 assert_never(unreachable)
+
+    def set_tag_colors(self, tag_colors: dict[str, str]) -> None:
+        """Update tag colors and refresh display."""
+        self._tag_colors = tag_colors
+
+    def _populate_tag_combo(self) -> None:
+        current = self.tag_combo.currentData()
+        self.tag_combo.blockSignals(True)
+        self.tag_combo.clear()
+        self.tag_combo.addItem("All tags", None)
+        if self._reader is not None:
+            self.tag_combo.addItem("Untagged", _UNTAGGED_MARKER)
+            for tag in self._reader.get_all_tag_keys():
+                self.tag_combo.addItem(tag, tag)
+        idx = self.tag_combo.findData(current)
+        if idx >= 0:
+            self.tag_combo.setCurrentIndex(idx)
+        self.tag_combo.blockSignals(False)
+
+    def _on_tag_filter_changed(self, index: int) -> None:
+        data = self.tag_combo.itemData(index)
+        self._active_tag_filter = data
+        if self._reader is not None:
+            self.refresh(self._reader)
 
     def _on_filter_changed(self, text: str) -> None:
         self._filter_text = text
@@ -511,3 +577,31 @@ class FeedTreePane(QtWidgets.QWidget):
         self.search_bar.setVisible(False)
         self.tree.setFocus()
         self.search_visibility_changed.emit(False)
+
+    def toggle_tag_filter(self) -> None:
+        """Toggle the tag filter combo visibility; hide resets to all feeds."""
+        if self.tag_combo.isVisible():
+            self.tag_combo.blockSignals(True)
+            self.tag_combo.setCurrentIndex(0)
+            self.tag_combo.blockSignals(False)
+            self.tag_combo.setVisible(False)
+            self._active_tag_filter = None
+            self.tag_filter_visibility_changed.emit(False)
+            if self._reader is not None:
+                self.refresh(self._reader)
+        else:
+            self.tag_combo.setVisible(True)
+            self.tag_combo.setFocus()
+            self.tag_filter_visibility_changed.emit(True)
+
+    def _on_tag_filter_escape(self) -> None:
+        """Hide the tag filter and reset to showing all feeds."""
+        self.tag_combo.blockSignals(True)
+        self.tag_combo.setCurrentIndex(0)
+        self.tag_combo.blockSignals(False)
+        self._active_tag_filter = None
+        self.tag_combo.setVisible(False)
+        self.tag_filter_visibility_changed.emit(False)
+        if self._reader is not None:
+            self.refresh(self._reader)
+        self.tree.setFocus()

@@ -497,13 +497,17 @@ class FeedReader:
         log.info("updating feed %s", feed_url)
         self.reader.update_feed(feed_url)
 
-    def get_feeds(self) -> Iterator[Feed]:
+    def get_feeds(self, tags: bool | list[str] | None = None) -> Iterator[Feed]:
         """Yield all subscribed feeds.
+
+        Args:
+            tags: ``None`` for all feeds, ``False`` for untagged only,
+                or a list of tag names (OR filtering).
 
         Yields:
             :class:`Feed` instances in an unspecified order.
         """
-        for f in self.reader.get_feeds():
+        for f in self.reader.get_feeds(tags=tags):
             yield Feed(
                 id=f.url,
                 title=f.resolved_title or "No Title",
@@ -619,3 +623,64 @@ class FeedReader:
             The unread entry count (0 if all are read).
         """
         return (self.reader.get_entry_counts(feed=feed.id, read=False).total) or 0
+
+    def get_feed_tags(self, feed_url: str) -> list[str]:
+        """Return tag names for a feed.
+
+        Args:
+            feed_url: The feed URL.
+
+        Returns:
+            A list of tag names (may be empty).
+        """
+        return [key for key, _ in self.reader.get_tags(feed_url)]
+
+    def get_all_tag_keys(self) -> list[str]:
+        """Return all tag names across all feeds.
+
+        Returns:
+            A sorted list of unique tag names.
+        """
+        return sorted(self.reader.get_tag_keys((None,)))
+
+    def set_feed_tag(self, feed_url: str, tag: str) -> None:
+        """Add a tag to a feed.
+
+        Args:
+            feed_url: The feed URL.
+            tag: The tag name to set.
+        """
+        log.info("setting tag '%s' on feed %s", tag, feed_url)
+        self.reader.set_tag(feed_url, tag, True)
+
+    def remove_feed_tag(self, feed_url: str, tag: str) -> None:
+        """Remove a tag from a feed.
+
+        Args:
+            feed_url: The feed URL.
+            tag: The tag name to remove.
+        """
+        log.info("removing tag '%s' from feed %s", tag, feed_url)
+        self.reader.delete_tag(feed_url, tag)
+
+    def rename_tag(self, old: str, new: str) -> None:
+        """Rename a tag across all feeds.
+
+        Args:
+            old: The current tag name.
+            new: The new tag name.
+        """
+        log.info("renaming tag '%s' to '%s'", old, new)
+        for feed in self.reader.get_feeds(tags=[old]):
+            self.reader.set_tag(feed.url, new, True)
+            self.reader.delete_tag(feed.url, old)
+
+    def delete_tag(self, tag: str) -> None:
+        """Delete a tag from all feeds.
+
+        Args:
+            tag: The tag name to delete.
+        """
+        log.info("deleting tag '%s' from all feeds", tag)
+        for feed in self.reader.get_feeds(tags=[tag]):
+            self.reader.delete_tag(feed.url, tag)

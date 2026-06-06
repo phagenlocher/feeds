@@ -9,6 +9,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 ItemTypeRole: int = QtCore.Qt.ItemDataRole.UserRole + 1
 FeedIndexRole: int = QtCore.Qt.ItemDataRole.UserRole + 2
 DataRole: int = QtCore.Qt.ItemDataRole.UserRole + 3
+TagsRole: int = QtCore.Qt.ItemDataRole.UserRole + 4
 
 log: logging.Logger = logging.getLogger(__name__)
 

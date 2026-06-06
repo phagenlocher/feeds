@@ -17,7 +17,10 @@ from feeds.ui.dialogs import (
     AboutDialog,
     AddFeedChoiceDialog,
     AddFeedDialog,
+    ManageTagsDialog,
     RenameFeedDialog,
+    TagFeedDialog,
+    _pick_tag_color,
 )
 from feeds.ui.panes import FeedTreePane
 
@@ -36,6 +39,7 @@ class FeedsApp(QtWidgets.QMainWindow):
             QtWidgets.QApplication.instance().font().pointSize()
         )
         self._font_size: int = self._default_font_size
+        self._tag_colors: dict[str, str] = {}
         self._settings_path: Path = (
             Path(
                 os.environ.get("FEEDS_DB_PATH")
@@ -45,6 +49,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         )
         self._update_action: QtGui.QAction | None = None
         self._searchbar_action: QtGui.QAction | None = None
+        self._tag_filter_action: QtGui.QAction | None = None
         self._zoom_in_action: QtGui.QAction | None = None
         self._zoom_out_action: QtGui.QAction | None = None
         self._zoom_reset_action: QtGui.QAction | None = None
@@ -71,6 +76,7 @@ class FeedsApp(QtWidgets.QMainWindow):
             log.exception("failed to initialize FeedReader")
             self.statusBar().showMessage("Failed to open feed database", 0)
             return
+        self._ensure_tag_colors()
         try:
             self.pane.refresh(self.reader)
         except (OSError, reader.ReaderError):
@@ -110,7 +116,18 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._searchbar_action.triggered.connect(self._toggle_search)
         display_menu.addAction(self._searchbar_action)
 
+        self._tag_filter_action = QtGui.QAction("Show &Tag Filter", self)
+        self._tag_filter_action.setCheckable(True)
+        self._tag_filter_action.setChecked(False)
+        self._tag_filter_action.setShortcut(QtGui.QKeySequence("Ctrl+T"))
+        self._tag_filter_action.triggered.connect(self._toggle_tag_filter)
+        display_menu.addAction(self._tag_filter_action)
+
         display_menu.addSeparator()
+
+        manage_tags_action = QtGui.QAction("&Manage Tags\u2026", self)
+        manage_tags_action.triggered.connect(self._on_manage_tags)
+        display_menu.addAction(manage_tags_action)
 
         self._zoom_in_action = QtGui.QAction("Zoom &In", self)
         self._zoom_in_action.setShortcut(QtGui.QKeySequence("Ctrl++"))
@@ -139,7 +156,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         help_menu.addAction(about_action)
 
     def _build_main_area(self, delegate: TwoLineRenderer) -> None:
-        self.pane = FeedTreePane(delegate, self)
+        self.pane = FeedTreePane(delegate, self._tag_colors, self)
         self.pane.entry_activated.connect(self._on_entry_activated)
         self.pane.entry_read_requested.connect(self._on_entry_read)
         self.pane.entry_unread_requested.connect(self._on_entry_unread)
@@ -149,6 +166,10 @@ class FeedsApp(QtWidgets.QMainWindow):
         self.pane.update_feed_requested.connect(self._update_single_feed)
         self.pane.prune_feed_requested.connect(self._prune_feed_async)
         self.pane.search_visibility_changed.connect(self._on_search_visibility_changed)
+        self.pane.tag_filter_visibility_changed.connect(
+            self._on_tag_filter_visibility_changed
+        )
+        self.pane.tag_feed_requested.connect(self._on_tag_feed_requested)
         self.setCentralWidget(self.pane)
 
     def _set_base_font(self) -> None:
@@ -164,11 +185,31 @@ class FeedsApp(QtWidgets.QMainWindow):
         saved = data.get("font_size")
         if isinstance(saved, int) and saved >= 6:
             self._font_size = saved
+        saved_colors = data.get("tag_colors")
+        if isinstance(saved_colors, dict):
+            self._tag_colors.clear()
+            self._tag_colors.update(
+                (k, v) for k, v in saved_colors.items() if isinstance(v, str)
+            )
+
+    def _ensure_tag_colors(self) -> None:
+        """Assign default colors to any tags that lack one."""
+        if self.reader is None:
+            return
+        changed = False
+        for tag in self.reader.get_all_tag_keys():
+            if tag not in self._tag_colors:
+                _pick_tag_color(tag, self._tag_colors)
+                changed = True
+        if changed:
+            self._save_settings()
 
     def _save_settings(self) -> None:
         self._settings_path.parent.mkdir(parents=True, exist_ok=True)
         self._settings_path.write_text(
-            json.dumps({"font_size": self._font_size}, indent=2)
+            json.dumps(
+                {"font_size": self._font_size, "tag_colors": self._tag_colors}, indent=2
+            )
         )
 
     def _zoom_in(self) -> None:
@@ -192,6 +233,44 @@ class FeedsApp(QtWidgets.QMainWindow):
     def _on_search_visibility_changed(self, visible: bool) -> None:
         if self._searchbar_action is not None:
             self._searchbar_action.setChecked(visible)
+
+    def _toggle_tag_filter(self) -> None:
+        self.pane.toggle_tag_filter()
+
+    def _on_tag_filter_visibility_changed(self, visible: bool) -> None:
+        if self._tag_filter_action is not None:
+            self._tag_filter_action.setChecked(visible)
+
+    def _on_tag_feed_requested(self, feed_index: int) -> None:
+        if self.reader is None:
+            return
+        if feed_index >= len(self.pane.feeds):
+            return
+        feed = self.pane.feeds[feed_index]
+        dialog = TagFeedDialog(feed.title, feed.id, self.reader, self._tag_colors, self)
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            log.info("tag feed dialog cancelled for %s", feed.id)
+            return
+        selected: set[str] = set(dialog.selected_tags)
+        current: set[str] = set(self.reader.get_feed_tags(feed.id))
+        log.info("tagging feed %s: %s", feed.id, selected)
+        for tag in selected - current:
+            self.reader.set_feed_tag(feed.id, tag)
+        for tag in current - set(selected):
+            self.reader.remove_feed_tag(feed.id, tag)
+        self._save_settings()
+        self.pane.set_tag_colors(self._tag_colors)
+        self.pane.refresh(self.reader)
+
+    def _on_manage_tags(self) -> None:
+        if self.reader is None:
+            return
+        dialog = ManageTagsDialog(self.reader, self._tag_colors, self)
+        dialog.exec()
+        self._save_settings()
+        self.pane.set_tag_colors(self._tag_colors)
+        if self.reader is not None:
+            self.pane.refresh(self.reader)
 
     def _apply_font_size(self) -> None:
         self._set_base_font()
