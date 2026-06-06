@@ -1,10 +1,13 @@
 """Custom item delegate for two-line list items."""
 
+import logging
 from typing import assert_never
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from feeds.ui.widgets import ItemType, ItemTypeRole
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 class TwoLineRenderer(QtWidgets.QStyledItemDelegate):

@@ -1,5 +1,6 @@
 """Reusable tree widget with hand cursor and font management."""
 
+import logging
 from enum import IntEnum, auto
 from typing import assert_never
 
@@ -8,6 +9,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 ItemTypeRole: int = QtCore.Qt.ItemDataRole.UserRole + 1
 FeedIndexRole: int = QtCore.Qt.ItemDataRole.UserRole + 2
 DataRole: int = QtCore.Qt.ItemDataRole.UserRole + 3
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 class ItemType(IntEnum):

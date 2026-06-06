@@ -153,7 +153,7 @@ class FeedTreePane(QtWidgets.QWidget):
                         if parent_feed is not None:
                             selected_feed_url = parent_feed.id
                             selected_entry_id = sel_entry.entry_id
-                case _:
+                case None:
                     log.warning("Unknown item type: %s", item_type)
 
         scroll_pos: int = self.tree.verticalScrollBar().value()
@@ -245,7 +245,9 @@ class FeedTreePane(QtWidgets.QWidget):
         unread = reader.get_unread_count(feed)
         title = _feed_label(feed, unread)
         ts = feed.last_updated.strftime("%Y-%m-%d") if feed.last_updated else ""
-        item = self.tree.build_item(title, ts, bool(unread), item_type=ItemType.FEED)
+        item = self.tree.build_item(
+            title, ts, bold=bool(unread), item_type=ItemType.FEED
+        )
         item.setToolTip(0, feed.id)
         item.setData(0, ItemTypeRole, ItemType.FEED)
         item.setData(0, FeedIndexRole, feed_idx)
@@ -266,7 +268,7 @@ class FeedTreePane(QtWidgets.QWidget):
         if entry.last_updated:
             parts.append(entry.last_updated.strftime("%Y-%m-%d"))
         subtitle = " · ".join(parts)
-        item = self.tree.build_item(entry.title, subtitle, not entry.read)
+        item = self.tree.build_item(entry.title, subtitle, bold=not entry.read)
         item.setData(0, ItemTypeRole, ItemType.ENTRY)
         item.setData(0, FeedIndexRole, feed_idx)
         item.setData(0, DataRole, entry)
@@ -291,7 +293,7 @@ class FeedTreePane(QtWidgets.QWidget):
         if unread < 0:
             unread = 0
         feed_item.setText(0, _feed_label(feed, unread))
-        self.tree.apply_font(feed_item, bool(unread))
+        self.tree.apply_font(feed_item, bold=bool(unread))
 
     @staticmethod
     def _parse_unread(text: str, title: str) -> int:
