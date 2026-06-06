@@ -43,7 +43,7 @@ for relative URL resolution.
 
 ### Stage 4: HTTP `Link` headers (RFC 5988)
 
-`_parse_link_header()` in `feeds/models/feed.py:136` parses the `Link`
+`_parse_link_header()` in `feeds/models/feed.py:144` parses the `Link`
 response header for feed references in the format:
 
 ```
@@ -55,7 +55,7 @@ returned.  Relative `href` values are resolved against the response URL.
 
 ### Stage 5: Common path probing
 
-As a last resort, `_try_common_paths()` in `feeds/models/feed.py:171`
+As a last resort, `_try_common_paths()` in `feeds/models/feed.py:176`
 probes well-known feed paths.  Each candidate is fetched and validated
 via `feedparser`.  Paths are probed relative to the domain root **and**
 relative to the current page's parent directory.
@@ -78,7 +78,7 @@ The most reliable method is a `<link>` element in the `<head>`:
 
 ### Recognised MIME types
 
-Defined in `FEED_MIME_TYPES` (`feeds/models/feed.py:92`):
+Defined in `FEED_MIME_TYPES` (`feeds/models/feed.py:100`):
 
 - `application/rss+xml`
 - `application/atom+xml`
@@ -95,13 +95,13 @@ Defined in `FEED_MIME_TYPES` (`feeds/models/feed.py:92`):
 
 A page can advertise **multiple feeds** (e.g. RSS + Atom, or per-section
 feeds).  feeds collects them all and presents them to the user in the
-discovery dialog (`feeds/app.py:179`).
+discovery dialog (`feeds/app.py:233`).
 
 ---
 
 ## 3. Well-Known Path Probing
 
-Defined in `_FEED_PATHS` (`feeds/models/feed.py:105`):
+Defined in `_FEED_PATHS` (`feeds/models/feed.py:113`):
 
 | Path | Primary target |
 |------|---------------|
@@ -118,11 +118,11 @@ Defined in `_FEED_PATHS` (`feeds/models/feed.py:105`):
 
 ## 4. Feed Validation
 
-`validate_feed()` in `feeds/discovery/utils.py:12` verifies that a
-candidate URL returns valid feed content.  It uses `reader._parser.default_parser()`
-to fetch and parse the URL; if the parser returns a result with a
-nonzero `version`, the candidate is considered valid.  The feed title
-is extracted from the parsed result.
+`validate_feed()` in `feeds/discovery/utils.py:14` verifies that a
+candidate URL returns valid feed content.  It fetches the URL via
+`requests.get()` and parses the response with `feedparser.parse()`. If
+the parser returns a result with a nonzero `version`, the candidate is
+considered valid.  The feed title is extracted from the parsed result.
 
 ---
 
@@ -134,7 +134,7 @@ The discovery flow in `feeds/app.py`:
 2. `FeedReader.discover_feeds(url)` is called on a background thread via `_service.discover_feeds()`
 3. Results are cached in `FeedReader.last_discovered_feeds`
 4. If exactly one feed is found, it is added immediately (`_add_discovered_feed`)
-5. If multiple feeds are found, a selection dialog is shown (handled in `feeds/app.py:238`)
+5. If multiple feeds are found, a selection dialog is shown (handled in `feeds/app.py:233`)
 6. The selected feed is subscribed via `FeedReader.add_feed()`
 
 ---

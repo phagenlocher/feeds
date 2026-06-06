@@ -4,10 +4,10 @@ feeds uses **PySide6** (Qt for Python) for its desktop GUI. The UI is
 built entirely programmatically; no `.ui` files or QSS stylesheets.
 
 ```
-FeedsApp (QMainWindow)                [feeds/app.py:18]
+FeedsApp (QMainWindow)                [feeds/app.py:27]
 ├── Menu Bar: "Feed" menu with "Add Feed" | "Update Feeds" | "Export Feeds" (OPML) | "Import Feeds" (OPML)
 ├── Menu Bar: "Display" menu with "Show Searchbar" | "Zoom In" | "Zoom Out" | "Reset Zoom"
-├── FeedTreePane                      [feeds/ui/panes.py:54]
+├── FeedTreePane                      [feeds/ui/panes.py:58]
 │   ├── SearchBar (QLineEdit)
 │   └── FeedTreeWidget (QTreeWidget)
 │       ├── Feed 1 (top-level, collapsible)
@@ -34,22 +34,22 @@ instantiates `FeedsApp`, and enters the Qt event loop.
 
 ## 2. Main Window: `FeedsApp`
 
-**File:** `feeds/app.py:18`
+**File:** `feeds/app.py:27`
 
 `FeedsApp(QMainWindow)` is the application window. Responsibilities:
 
-- **Menu bar** (line 56): "Feed" menu with "Add Feed" action (triggers
+- **Menu bar** (line 82): "Feed" menu with "Add Feed" action (triggers
   discovery flow) and "Update Feeds" action (triggers background update
   of all feeds).
-- **Display menu** (line 82): "Show Searchbar" checkable action
+- **Display menu** (line 105): "Show Searchbar" checkable action
   (`Ctrl+F`) toggles the fuzzy search bar (see §10). "Zoom In"
   (`Ctrl++`), "Zoom Out" (`Ctrl+-`), and "Reset Zoom" (`Ctrl+0`)
   control the application font size.
-- **Font zoom** (line 93): Applies globally via
+- **Font zoom** (line 196): Applies globally via
   `QApplication.setFont()` and propagates to the tree widget's
   item heights. Default is 12pt, clamped to minimum 6pt.
-- **FeedTreePane** (line 69): Single central widget containing a
-- **Busy state** (line 113): Disables the "Update" menu action during
+- **FeedTreePane** (line 141): Single central widget containing a
+- **Busy state** (line 200): Disables the "Update" menu action during
   background operations and shows "Updating…" text.
 - **Status bar**: Shows transient messages (errors, progress updates)
   that auto-clear after a configurable timeout.
@@ -58,12 +58,15 @@ instantiates `FeedsApp`, and enters the Qt event loop.
 
 | Signal | Handler | Description |
 |--------|---------|-------------|
-| `FeedTreePane.entry_activated(Entry)` | `_on_entry_activated` (line 151) | Marks entry read + opens URL in system browser |
-| `FeedTreePane.entry_read_requested(Entry)` | `_on_entry_read` (line 155) | Marks a single entry as read |
-| `FeedTreePane.entry_unread_requested(Entry)` | `_on_entry_unread` (line 158) | Marks a single entry as unread |
-| `FeedTreePane.read_all_requested(int)` | `_read_all_async` (line 316) | Marks all entries in a feed as read |
-| `FeedTreePane.remove_feed_requested(int)` | `_remove_feed_async` (line 294) | Unsubscribes and deletes a feed |
-| `FeedTreePane.update_feed_requested(int)` | `_update_single_feed` (line 274) | Manually updates a single feed |
+| `FeedTreePane.entry_activated(Entry)` | `_on_entry_activated` (line 223) | Marks entry read + opens URL in system browser |
+| `FeedTreePane.entry_read_requested(Entry)` | `_on_entry_read` (line 227) | Marks a single entry as read |
+| `FeedTreePane.entry_unread_requested(Entry)` | `_on_entry_unread` (line 230) | Marks a single entry as unread |
+| `FeedTreePane.read_all_requested(int)` | `_read_all_async` (line 513) | Marks all entries in a feed as read |
+| `FeedTreePane.remove_feed_requested(int)` | `_remove_feed_async` (line 457) | Unsubscribes and deletes a feed |
+| `FeedTreePane.rename_feed_requested(int)` | `_rename_feed` (line 480) | Opens rename dialog for a feed |
+| `FeedTreePane.update_feed_requested(int)` | `_update_single_feed` (line 434) | Manually updates a single feed |
+| `FeedTreePane.prune_feed_requested(int, int)` | `_prune_feed_async` (line 536) | Prunes old entries from a feed |
+| `FeedTreePane.search_visibility_changed(bool)` | `_on_search_visibility_changed` (line 192) | Keeps searchbar action checked state in sync |
 
 ### Async flow
 
@@ -75,10 +78,10 @@ background `QThread`. Callbacks rebuild the tree via `refresh(reader)`.
 
 ## 3. Tree Pane: `FeedTreePane`
 
-**File:** `feeds/ui/panes.py:30`
+**File:** `feeds/ui/panes.py:58`
 
-`FeedTreePane(QWidget)` replaces the old two-pane splitter. It
-contains a single `FeedTreeWidget(QTreeWidget)` where:
+`FeedTreePane(QWidget)` contains a single `FeedTreeWidget(QTreeWidget)`
+where:
 
 - **Top-level items** = subscribed feeds
 - **Child items** = entries (posts) of that feed
@@ -96,6 +99,7 @@ contains a single `FeedTreeWidget(QTreeWidget)` where:
 | `rename_feed_requested` | `int` (feed row) | "Rename" context menu |
 | `update_feed_requested` | `int` (feed row) | "Update feed" context menu |
 | `prune_feed_requested` | `int, int` (feed row, n) | "Prune entries" context menu |
+| `search_visibility_changed` | `bool` | Search bar shown/hidden |
 
 ### Display: feed items
 
@@ -142,7 +146,7 @@ Bulk operations (update all, mark all as read, remove) trigger a full
 
 ## 4. Tree Widget: `FeedTreeWidget`
 
-**File:** `feeds/ui/widgets.py:11`
+**File:** `feeds/ui/widgets.py:23`
 
 A `QTreeWidget` subclass used by `FeedTreePane`. Features:
 
@@ -154,14 +158,14 @@ A `QTreeWidget` subclass used by `FeedTreePane`. Features:
   `QTreeWidgetItem` with the subtitle stored in `UserRole` data.
 - **Animations**: `setAnimated(True)` for smooth expand/collapse.
 - **Hidden header**: no column headers displayed.
-- **Selection styling**: blue background / white text via inline
-  stylesheet.
+- **Selection styling**: handled by the `TwoLineRenderer` delegate,
+  which uses palette highlight colors.
 
 ### Custom data roles (widgets.py)
 
 | Role | Value | Used on |
 |------|-------|---------|
-| `ItemTypeRole` (User+1) | `"feed"` / `"entry"` | All items |
+| `ItemTypeRole` (User+1) | `ItemType.FEED` (1) / `ItemType.ENTRY` (2) | All items |
 | `FeedIndexRole` (User+2) | `int` (index in `pane.feeds`) | All items |
 | `DataRole` (User+3) | `Feed` / `Entry` | All items |
 
@@ -169,13 +173,13 @@ A `QTreeWidget` subclass used by `FeedTreePane`. Features:
 
 ## 5. Item Delegate: `TwoLineRenderer`
 
-**File:** `feeds/ui/delegates.py:6`
+**File:** `feeds/ui/delegates.py:13`
 
 A `QStyledItemDelegate` that paints each tree item in two lines:
 
 ```
 Title (bold if unread, or normal weight)   ← top half
-Subtitle (gray #888888, smaller font)      ← bottom half
+Subtitle (muted palette color, smaller font)  ← bottom half
 ```
 
 - **Selected state**: Uses palette highlight colors for both title and
@@ -194,7 +198,7 @@ Simple dialog with a URL input field:
   returns both a `scheme` and `netloc`.
 - **Enter key** submits, Escape cancels.
 
-### `AddFeedChoiceDialog`: `feeds/ui/dialogs.py:46`
+### `AddFeedChoiceDialog`: `feeds/ui/dialogs.py:88`
 
 Shown when multiple feeds are discovered from a single URL:
 
@@ -206,7 +210,7 @@ Shown when multiple feeds are discovered from a single URL:
 
 ## 7. Background Threading
 
-### `FeedService`: `feeds/services/feed_service.py:21`
+### `FeedService`: `feeds/services/feed_service.py:22`
 
 Orchestrates async feed operations. Maintains a single `WorkerThread`
 and a FIFO queue of pending operations.
@@ -216,7 +220,8 @@ and a FIFO queue of pending operations.
 - Sequential execution: each operation must finish before the next
   starts (`_process_queue`).
 - High-level wrappers: `add_feed`, `discover_feeds`, `update_feed`,
-  `update_feeds`, `delete_feed`, `mark_all_as_read`.
+  `update_feeds`, `delete_feed`, `mark_all_as_read`, `prune_feed`,
+  `set_feed_user_title`.
 
 ### `WorkerThread`: `feeds/services/worker.py:11`
 
@@ -275,7 +280,7 @@ powered by **rapidfuzz** (`fuzz.partial_ratio`).
 ### Fuzzy matching
 
 - Each entry's title is compared against the search query using
-  `rapidfuzz.fuzz.partial_ratio` with a threshold of 60.
+  `rapidfuzz.fuzz.partial_ratio` with a threshold of 80.
 - Entries that match are shown; non-matching entries are hidden via
   `QTreeWidgetItem.setHidden(True)`.
 - Feed items (top-level) are hidden when they have zero visible

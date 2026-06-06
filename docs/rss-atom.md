@@ -42,12 +42,12 @@ Used for all HTTP fetches during feed discovery (not for feed updates;
 
 ## 2. `FeedReader` Class
 
-**File:** `feeds/models/feed.py:275`
+**File:** `feeds/models/feed.py:294`
 
 High-level wrapper around `reader.Reader` that adds feed discovery and
 converts reader types into local `Feed`/`Entry` dataclasses.
 
-### Initialisation (line 292)
+### Initialisation (line 311)
 
 ```python
 def __init__(self) -> None:
@@ -62,39 +62,42 @@ overridden with the `FEEDS_DB_PATH` environment variable.
 
 | Method | Line | Description |
 |--------|------|-------------|
-| `add_feed(url)` | 298 | Subscribe to a feed (no-op if already subscribed) |
-| `discover_feeds(url)` | 448 | Discover feed URLs from a page, caches results |
-| `update_feeds(scheduled=True)` | 474 | Update all feeds with adaptive parallelism |
-| `update_feed(feed_url)` | 481 | Update a single feed |
-| `get_feeds()` | 490 | Yield all subscribed `Feed` instances |
-| `get_posts(feed)` | 499 | Yield all `Entry` instances for a feed |
-| `mark_entry_as_read(entry)` | 525 | Mark entry as read |
-| `mark_entry_as_unread(entry)` | 534 | Mark entry as unread |
-| `delete_feed(feed)` | 543 | Unsubscribe and delete a feed |
-| `mark_all_as_read(feed)` | 552 | Mark all entries in a feed as read |
-| `get_unread_count(feed)` | 562 | Return unread count for a feed |
+| `add_feed(url)` | 317 | Subscribe to a feed (no-op if already subscribed) |
+| `discover_feeds(url)` | 454 | Discover feed URLs from a page, caches results |
+| `update_feeds(scheduled=True)` | 480 | Update all feeds with adaptive parallelism |
+| `update_feed(feed_url)` | 491 | Update a single feed |
+| `get_feeds()` | 500 | Yield all subscribed `Feed` instances |
+| `get_posts(feed)` | 514 | Yield all `Entry` instances for a feed |
+| `mark_entry_as_read(entry)` | 530 | Mark entry as read |
+| `mark_entry_as_unread(entry)` | 539 | Mark entry as unread |
+| `set_feed_user_title(feed, title)` | 548 | Set a custom display title for a feed |
+| `delete_feed(feed)` | 558 | Unsubscribe and delete a feed |
+| `mark_all_as_read(feed)` | 567 | Mark all entries in a feed as read |
+| `prune_feed(feed, n)` | 577 | Keep only the `n` most recent entries |
+| `get_unread_count(feed)` | 612 | Return unread count for a feed |
 
 ### Properties
 
 | Property | Line | Description |
 |----------|------|-------------|
-| `last_discovered_feeds` | 465 | Cached result from last `discover_feeds()` call |
+| `last_discovered_feeds` | 471 | Cached result from last `discover_feeds()` call |
 
 ---
 
 ## 3. Data Models
 
-### `Feed`: `feeds/models/feed.py:236`
+### `Feed`: `feeds/models/feed.py:254`
 
 ```python
 @dataclass(frozen=True, slots=True)
 class Feed:
     id: str                    # Feed URL (unique identifier)
     title: str                 # Display title
+    user_title: str | None     # Custom user-set display title (None = use feed title)
     last_updated: datetime | None  # Most recent update timestamp
 ```
 
-### `Entry`: `feeds/models/feed.py:252`
+### `Entry`: `feeds/models/feed.py:272`
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -126,7 +129,7 @@ to create modified copies when toggling read state.
 
 ## 5. Feed Updating
 
-### All feeds (line 474)
+### All feeds (line 480)
 
 ```python
 def update_feeds(self, scheduled: bool = True) -> None:
@@ -144,7 +147,7 @@ update scheduling (60-minute interval) causes feeds updated recently
 to be silently skipped. Pass `scheduled=False` to force a full refresh
 of every subscribed feed.
 
-### Single feed (line 481)
+### Single feed (line 491)
 
 ```python
 def update_feed(self, feed_url: str) -> None:
@@ -163,9 +166,6 @@ Read state is tracked per-entry by the `reader` library.
 | Mark unread | `mark_entry_as_unread(entry)` | Calls `reader.mark_entry_as_unread((feed_id, entry_id))` |
 | Mark all read | `mark_all_as_read(feed)` | Iterates all entries, marks each read |
 | Count unread | `get_unread_count(feed)` | Calls `reader.get_entry_counts(feed=..., read=False).total` |
-
-Entries without a `link` attribute are skipped with a warning log
-during iteration (`get_posts`, line 511-514).
 
 ---
 
