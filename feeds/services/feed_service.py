@@ -11,7 +11,7 @@ from feeds.services.worker import WorkerThread
 log: logging.Logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class _PendingOp:
     fn: Callable[[], object]
     name: str
@@ -198,3 +198,34 @@ class FeedService:
             on_done,
             on_error,
         )
+
+    def export_feeds(
+        self,
+        path: str,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        """Enqueue OPML export on a background worker."""
+        log.info("exporting feeds to %s", path)
+
+        def _export() -> None:
+            export = self._reader.reader.export_feeds()
+            with open(path, "wb") as f:
+                f.write(export.content)
+
+        self.run(_export, "export_feeds", on_done, on_error)
+
+    def import_feeds(
+        self,
+        path: str,
+        on_done: Callable[[], object] | None = None,
+        on_error: Callable[[str], object] | None = None,
+    ) -> None:
+        """Enqueue OPML import on a background worker."""
+        log.info("importing feeds from %s", path)
+
+        def _import() -> None:
+            with open(path, "rb") as f:
+                self._reader.reader.import_feeds(f)
+
+        self.run(_import, "import_feeds", on_done, on_error)
