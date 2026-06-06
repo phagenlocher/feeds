@@ -7,6 +7,7 @@ the goahead/parse_starttag overrides with parent-class fallbacks.
 import importlib
 import logging
 import sys
+from pathlib import Path
 
 mod = importlib.import_module("reader._vendor.feedparser.html")
 path = mod.__file__
@@ -14,7 +15,7 @@ if not path or not path.endswith(".py"):
     logging.error("no .py file found: %s", path)
     sys.exit(1)
 
-with open(path) as f:
+with Path(path).open() as f:
     src = f.read()
 
 old_block = """    # By declaring these methods and overriding their compiled code
@@ -50,7 +51,7 @@ new_block = """    def parse_starttag(self, i):
 
 src = src.replace(old_block, new_block)
 
-with open(path, "w") as f:
+with Path(path).open("w") as f:
     _ = f.write(src)
 
 assert "goahead.__code__" not in src, "patch failed: __code__ still in file"
