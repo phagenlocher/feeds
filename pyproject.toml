@@ -65,6 +65,9 @@ extend-select = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.setuptools.packages.find]
+include = ["feeds*"]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
