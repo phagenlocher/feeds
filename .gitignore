@@ -30,3 +30,9 @@ htmlcov/
 
 # Static build venv
 .static-venv/
+
+# Scratch / temp
+scratch/
+
+# AI tooling
+.opencode/
