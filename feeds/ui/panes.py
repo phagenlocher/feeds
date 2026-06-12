@@ -56,6 +56,7 @@ class EntryMenuAction(IntEnum):
 
     MARK_READ = auto()
     MARK_UNREAD = auto()
+    COPY_LINK = auto()
 
 
 class FeedTreePane(QtWidgets.QWidget):
@@ -487,6 +488,10 @@ class FeedTreePane(QtWidgets.QWidget):
         act = menu.addAction(label)
         act.setData(act_kind)
 
+        menu.addSeparator()
+        act = menu.addAction("Copy Link")
+        act.setData(EntryMenuAction.COPY_LINK)
+
         action = menu.exec(self.tree.viewport().mapToGlobal(pos))
         if action is None:
             return
@@ -500,6 +505,9 @@ class FeedTreePane(QtWidgets.QWidget):
                 log.info("mark unread requested for entry %s", entry.url)
                 self.mark_entry_unread(item)
                 self.entry_unread_requested.emit(entry)
+            case EntryMenuAction.COPY_LINK:
+                log.info("copied entry URL: %s", entry.url)
+                QtWidgets.QApplication.clipboard().setText(entry.url)
             case _ as unreachable:
                 assert_never(unreachable)
 
