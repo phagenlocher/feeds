@@ -32,3 +32,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/feeds-*
+
+  upload-license-files:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload License Files
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            LICENSE
+            THIRD-PARTY-NOTICES
