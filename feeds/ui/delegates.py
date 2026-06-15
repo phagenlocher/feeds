@@ -146,7 +146,7 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
                 painter.setPen(border_pen)
                 painter.drawRoundedRect(tag_rect, _TAG_RADIUS, _TAG_RADIUS)
 
-                text_color_pill = QtGui.QColor("#000000")
+                text_color_pill = text_color
                 painter.setPen(text_color_pill)
                 painter.drawText(
                     tag_rect.adjusted(_TAG_PADDING_H, 0, -_TAG_PADDING_H, 0),
