@@ -1,0 +1,46 @@
+name: Release Build
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+          - os: macos-15-intel
+            target: macos-x86_64
+          - os: macos-latest
+            target: macos-aarch64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: "3.11"
+      - uses: extractions/setup-just@v4
+      - run: just build "-${{ matrix.target }}"
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/feeds-*
+
+  upload-license-files:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Upload License Files
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            LICENSE
+            THIRD-PARTY-NOTICES
