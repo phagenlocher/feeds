@@ -1,13 +1,13 @@
-_static-venv:
-    uv venv --python 3.11 --seed .static-venv
-    .static-venv/bin/pip install -q -e . 'nuitka[onefile]==4.1.2'
+_build-venv:
+    uv venv --python 3.11 --seed .build-venv
+    .build-venv/bin/pip install -q -e . 'nuitka[onefile]==4.1.2'
     # Patch vendored feedparser __code__ assignment for Nuitka compatibility
-    .static-venv/bin/python scripts/patch-feedparser.py
+    .build-venv/bin/python scripts/patch-feedparser.py
     # Patch reader _sqlite_utils dict-comp in finally for Nuitka 4.1 compat
-    .static-venv/bin/python scripts/patch-sqlite-utils.py
+    .build-venv/bin/python scripts/patch-sqlite-utils.py
 
-build suffix="": _static-venv
-    .static-venv/bin/nuitka \
+build suffix="": _build-venv
+    .build-venv/bin/nuitka \
       --onefile \
       --enable-plugin=pyside6 \
       --include-package=reader \

@@ -28,8 +28,8 @@ build/
 htmlcov/
 .tox/
 
-# Static build venv
-.static-venv/
+# Build venv
+.build-venv/
 
 # Scratch / temp
 scratch/
