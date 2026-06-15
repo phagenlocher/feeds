@@ -489,7 +489,7 @@ class FeedTreePane(QtWidgets.QWidget):
         act.setData(act_kind)
 
         menu.addSeparator()
-        act = menu.addAction("Copy Link")
+        act = menu.addAction("Copy URL")
         act.setData(EntryMenuAction.COPY_LINK)
 
         action = menu.exec(self.tree.viewport().mapToGlobal(pos))
