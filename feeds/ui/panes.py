@@ -127,6 +127,7 @@ class FeedTreePane(QtWidgets.QWidget):
         self.tree = FeedTreeWidget(self)
         self.tree.setItemDelegate(delegate)
         self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
+        self.tree.enter_pressed.connect(self._on_item_enter_pressed)
         self.tree.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._on_context_menu)
         layout.addWidget(self.tree)
@@ -355,6 +356,25 @@ class FeedTreePane(QtWidgets.QWidget):
                 log.info("opening entry in browser: %s", entry.url)
                 webbrowser.open(entry.url)
             case ItemType.FEED | None:
+                pass
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    def _on_item_enter_pressed(self, item: QtWidgets.QTreeWidgetItem) -> None:
+        item_type: ItemType | None = item.data(0, ItemTypeRole)
+        match item_type:
+            case ItemType.ENTRY:
+                entry: Entry | None = item.data(0, DataRole)
+                if entry is None:
+                    return
+                if not entry.read:
+                    self.mark_entry_read(item)
+                    self.entry_activated.emit(entry)
+                log.info("opening entry in browser: %s", entry.url)
+                webbrowser.open(entry.url)
+            case ItemType.FEED:
+                item.setExpanded(not item.isExpanded())
+            case None:
                 pass
             case _ as unreachable:
                 assert_never(unreachable)

@@ -24,6 +24,8 @@ class ItemType(IntEnum):
 class FeedTreeWidget(QtWidgets.QTreeWidget):
     """Tree widget with hand cursor on items and font-scaling support."""
 
+    enter_pressed: QtCore.Signal = QtCore.Signal(QtWidgets.QTreeWidgetItem)
+
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Build tree widget with hand cursor and font management."""
         super().__init__(parent)
@@ -35,6 +37,15 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
         self.setMouseTracking(True)
         self.viewport().installEventFilter(self)
         self.setAnimated(True)
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:  # noqa: N802
+        """Intercept Enter/Return to emit enter_pressed on the selected item."""
+        if event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter):
+            items: list[QtWidgets.QTreeWidgetItem] = self.selectedItems()
+            if items:
+                self.enter_pressed.emit(items[0])
+                return
+        super().keyPressEvent(event)
 
     @staticmethod
     def _item_height(size: int, item_type: ItemType | None = None) -> int:
