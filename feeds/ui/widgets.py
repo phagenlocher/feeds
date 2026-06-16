@@ -45,6 +45,10 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
             if items:
                 self.enter_pressed.emit(items[0])
                 return
+        if event.key() == QtCore.Qt.Key.Key_Escape:
+            self.clearSelection()
+            self.setCurrentItem(None)
+            return
         super().keyPressEvent(event)
 
     @staticmethod
