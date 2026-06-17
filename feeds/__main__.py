@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PySide6 import QtWidgets
 
+from feeds import __version__
 from feeds.app import FeedsApp
 
 
@@ -23,6 +24,7 @@ def main() -> None:
         default=Path("~/.feeds").expanduser(),
         help="Data directory for feeds.db and settings.json (default: ~/.feeds)",
     )
+    parser.add_argument("--version", action="version", version=__version__)
     args, _ = parser.parse_known_args()
 
     logging.basicConfig(

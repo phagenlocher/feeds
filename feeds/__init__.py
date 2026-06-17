@@ -3,6 +3,6 @@
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__: str = version("feeds")
+    __version__: str = f"v{version('feeds')}"
 except PackageNotFoundError:
     __version__ = "unknown"
