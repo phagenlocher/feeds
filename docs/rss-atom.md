@@ -56,7 +56,8 @@ def __init__(self) -> None:
 ```
 
 The SQLite database path defaults to `~/.feeds/feeds.db` and can be
-overridden with the `FEEDS_DB_PATH` environment variable.
+overridden with the `--data-dir` / `-d` CLI argument or by
+instantiating `FeedReader(data_dir=...)` directly.
 
 ### Public API
 
@@ -127,7 +128,7 @@ to create modified copies when toggling read state.
 
 - **Engine**: SQLite
 - **Default path**: `~/.feeds/feeds.db`
-- **Override**: `FEEDS_DB_PATH` environment variable
+- **Override**: `--data-dir` / `-d` CLI argument (or `FeedReader(data_dir=...)`)
 - **Managed by**: the `reader` library. No raw SQL is written in
   feeds; all database operations go through `reader`'s API.
 

@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
@@ -30,9 +29,15 @@ log: logging.Logger = logging.getLogger(__name__)
 class FeedsApp(QtWidgets.QMainWindow):
     """Main window orchestrating menu bar, tree pane, zoom, and async operations."""
 
-    def __init__(self, reader: FeedReader | None = None) -> None:
-        """Set up menu bar, pane, font, zoom, reader, service and load feeds."""
+    def __init__(self, data_dir: Path | None = None) -> None:
+        """Set up menu bar, pane, font, zoom, reader, service and load feeds.
+
+        Args:
+            data_dir: Data directory for feeds.db and settings.json.
+                Defaults to ``~/.feeds``.
+        """
         super().__init__()
+        self._data_dir: Path = (data_dir or Path("~/.feeds").expanduser()).resolve()
         self.reader: FeedReader | None = None
         self._service: FeedService | None = None
         self._default_font_size: int = (
@@ -40,13 +45,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         )
         self._font_size: int = self._default_font_size
         self._tag_colors: dict[str, str] = {}
-        self._settings_path: Path = (
-            Path(
-                os.environ.get("FEEDS_DB_PATH")
-                or Path("~/.feeds/feeds.db").expanduser()
-            ).parent
-            / "settings.json"
-        )
+        self._settings_path: Path = self._data_dir / "settings.json"
         self._update_action: QtGui.QAction | None = None
         self._searchbar_action: QtGui.QAction | None = None
         self._tag_filter_action: QtGui.QAction | None = None
@@ -70,7 +69,7 @@ class FeedsApp(QtWidgets.QMainWindow):
         self._load_settings()
         self._apply_font_size()
         try:
-            self.reader = FeedReader()
+            self.reader = FeedReader(data_dir=self._data_dir)
             self._service = FeedService(self.reader)
         except OSError:
             log.exception("failed to initialize FeedReader")

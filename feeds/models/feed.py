@@ -43,10 +43,6 @@ from feeds.discovery.youtube import try_youtube
 
 log: logging.Logger = logging.getLogger(__name__)
 
-_DB_PATH: Path = Path(
-    os.environ.get("FEEDS_DB_PATH") or Path("~/.feeds/feeds.db").expanduser()
-)
-
 
 class _FeedLinkFinder(HTMLParser):
     """HTML parser that extracts feed ``<link>`` tags from a page.
@@ -295,8 +291,7 @@ class FeedReader:
     """High-level interface for feed management and discovery.
 
     Wraps the ``reader`` library and provides feed discovery,
-    subscription management, and entry navigation.  All database
-    state is persisted to the SQLite database at :data:`_DB_PATH`.
+    subscription management, and entry navigation.
 
     Typical usage::
 
@@ -308,10 +303,16 @@ class FeedReader:
                 print(entry.title)
     """
 
-    def __init__(self) -> None:
-        """Initialise the reader, creating the database directory if needed."""
-        _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        self.reader: reader.Reader = reader.make_reader(str(_DB_PATH))
+    def __init__(self, data_dir: Path | None = None) -> None:
+        """Initialise the reader, creating the database directory if needed.
+
+        Args:
+            data_dir: Data directory for feeds.db. Defaults to ``~/.feeds``.
+        """
+        resolved_dir: Path = (data_dir or Path("~/.feeds").expanduser()).resolve()
+        db_path: Path = resolved_dir / "feeds.db"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.reader: reader.Reader = reader.make_reader(str(db_path))
         self._last_discovered_feeds: list[tuple[str, str]] = []
 
     def add_feed(self, url: str) -> None:

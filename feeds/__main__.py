@@ -3,6 +3,7 @@
 import argparse
 import logging
 import sys
+from pathlib import Path
 
 from PySide6 import QtWidgets
 
@@ -15,6 +16,13 @@ def main() -> None:
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable debug logging"
     )
+    parser.add_argument(
+        "-d",
+        "--data-dir",
+        type=Path,
+        default=Path("~/.feeds").expanduser(),
+        help="Data directory for feeds.db and settings.json (default: ~/.feeds)",
+    )
     args, _ = parser.parse_known_args()
 
     logging.basicConfig(
@@ -23,7 +31,7 @@ def main() -> None:
     )
 
     qapp = QtWidgets.QApplication(sys.argv)
-    window = FeedsApp()
+    window = FeedsApp(data_dir=args.data_dir)
     window.show()
     sys.exit(qapp.exec())
 
