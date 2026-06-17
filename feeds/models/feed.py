@@ -483,9 +483,9 @@ class FeedReader:
         Args:
             scheduled: Whether to obey the per-feed update schedule.
         """
-        log.info("updating all feeds")
         feed_count: int = len(list(self.reader.get_feeds()))
-        workers: int = min(feed_count, (os.cpu_count() or 1) * 2)
+        workers: int = max(1, min(feed_count, os.cpu_count() or 1))
+        log.info("updating all feeds with %d workers", workers)
         self.reader.update_feeds(workers=workers, scheduled=scheduled)
 
     def update_feed(self, feed_url: str) -> None:
