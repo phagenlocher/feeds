@@ -325,6 +325,14 @@ class FeedReader:
         log.info("subscribing to feed %s", url)
         self.reader.add_feed(url, exist_ok=True)
 
+    @property
+    def has_feeds(self) -> bool:
+        """Returns True if the reader has any feeds."""
+        feed_count: int | None = self.reader.get_feed_counts().total
+        if feed_count:
+            return feed_count > 0
+        return False
+
     @staticmethod
     def _discover_feed_urls(url: str) -> list[tuple[str, str]]:
         """Discover feed URLs from *url* using multiple methods.
@@ -483,8 +491,11 @@ class FeedReader:
         Args:
             scheduled: Whether to obey the per-feed update schedule.
         """
-        feed_count: int = len(list(self.reader.get_feeds()))
-        workers: int = max(1, min(feed_count, os.cpu_count() or 1))
+        feed_count: int = self.reader.get_feed_counts().total or 0
+        if feed_count <= 0:
+            log.info("no feeds to update")
+            return
+        workers: int = min(feed_count, os.cpu_count() or 1)
         log.info("updating all feeds with %d workers", workers)
         self.reader.update_feeds(workers=workers, scheduled=scheduled)
 

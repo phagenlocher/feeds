@@ -479,6 +479,9 @@ class FeedsApp(QtWidgets.QMainWindow):
         """Update all feeds with status and busy feedback."""
         if self._service is None:
             return
+        if not self._service.has_feeds:
+            log.info("no feeds to update, skipping updating all feeds")
+            return
         log.info("updating all feeds (scheduled=%s)", scheduled)
         self.statusBar().showMessage("Updating feeds\u2026")
         self._set_busy(busy=True)

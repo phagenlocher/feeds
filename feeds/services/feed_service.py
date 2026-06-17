@@ -37,6 +37,11 @@ class FeedService:
         """True when a worker thread is actively processing an operation."""
         return self._worker is not None
 
+    @property
+    def has_feeds(self) -> bool:
+        """Return True if the service has any feeds."""
+        return self._reader.has_feeds
+
     def run(
         self,
         fn: Callable[[], object],
