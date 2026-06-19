@@ -5,9 +5,11 @@ import logging
 import feedparser
 import requests
 
+from feeds import __version__
+
 log: logging.Logger = logging.getLogger(__name__)
 
-USER_AGENT = "feeds/0.1"
+USER_AGENT = f"feeds/{__version__}"
 _FEED_TIMEOUT = 10
 
 
