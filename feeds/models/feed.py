@@ -35,10 +35,10 @@ from tenacity import (
     wait_exponential,
 )
 
+from feeds import USER_AGENT
 from feeds.discovery.medium import try_medium
 from feeds.discovery.reddit import try_reddit
 from feeds.discovery.substack import try_substack
-from feeds.discovery.utils import USER_AGENT
 from feeds.discovery.youtube import try_youtube
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -312,6 +312,7 @@ class FeedReader:
         resolved_dir: Path = (data_dir or Path("~/.feeds").expanduser()).resolve()
         db_path: Path = resolved_dir / "feeds.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        reader.USER_AGENT = USER_AGENT
         self.reader: reader.Reader = reader.make_reader(str(db_path))
         self._last_discovered_feeds: list[tuple[str, str]] = []
 

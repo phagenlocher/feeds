@@ -22,7 +22,8 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 
-from feeds.discovery.utils import USER_AGENT, validate_feed
+from feeds import USER_AGENT
+from feeds.discovery.utils import validate_feed
 
 log: logging.Logger = logging.getLogger(__name__)
 
