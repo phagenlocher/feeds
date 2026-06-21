@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6 import QtWidgets
 
 from feeds import __version__
+from feeds._single_instance import SingleInstanceGuard
 from feeds.app import FeedsApp
 
 
@@ -32,7 +33,21 @@ def main() -> None:
         format="%(levelname)s:%(name)s:%(message)s",
     )
 
-    qapp = QtWidgets.QApplication(sys.argv)
+    qapp: QtWidgets.QApplication = QtWidgets.QApplication(sys.argv)
+
+    window: FeedsApp | None = None
+
+    def _focus_window() -> None:
+        nonlocal window
+        if window is not None:
+            window.showNormal()
+            window.raise_()
+            window.activateWindow()
+            qapp.alert(window, 3000)
+
+    guard: SingleInstanceGuard = SingleInstanceGuard(on_focus=_focus_window)
+    guard.assume_single_instance()
+
     window = FeedsApp(data_dir=args.data_dir)
     window.show()
     sys.exit(qapp.exec())

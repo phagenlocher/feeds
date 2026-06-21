@@ -280,6 +280,50 @@ It provides filtering of top-level feeds by tag via the ``reader``
 library's native OR filter (`reader.get_feeds(tags=[tag])`).  The
 combo lists "All tags" (default), "Untagged", and each defined tag.
 
+---
+
+## 11. Single-Instance Guard
+
+**File:** `feeds/_single_instance.py`
+
+The app prevents multiple concurrent processes via `SingleInstanceGuard`, which
+uses two Qt primitives working together:
+
+1. **`QSharedMemory`** (`feeds-app` key) — atomic first-instance detection at
+   the OS level.  The winning process creates a 1-byte segment; subsequent
+   processes fail to attach (the OS owns the key and releases it on crash).
+2. **`QLocalServer`** / **`QLocalSocket`** — the first instance listens on a
+   named socket (`/tmp/feeds-app` on Linux / macOS, a named pipe on Windows).
+   Secondary instances connect, send `b"focus"`, and exit.
+
+### Flow
+
+```
+Secondary instance                  First instance
+       │                                  │
+       ├─ QSharedMemory.attach() ─────────┤
+       │  (fails — already owned)         │
+       ├─ QLocalSocket.connect() ────────►│
+       │  sends b"focus"                  ├─ QLocalServer.newConnection
+       │  sys.exit(0)                     │  → showNormal/raise_/activateWindow
+       │                                  │  → QApplication.alert(3000ms)
+```
+
+### Race-condition recovery
+
+If two instances start simultaneously, `QSharedMemory.create()` succeeds for
+exactly one process (atomic OS mutex); the loser retries `attach()`, connects,
+and exits.
+
+### Platform notes
+
+| Platform | Activation |
+|----------|-----------|
+| X11/Linux | `raise_()` + `activateWindow()` — may be blocked by some WMs |
+| Wayland | `activateWindow()` often denied; `alert()` provides taskbar flash |
+| macOS | `raise_()` + `activateWindow()` work; `alert()` flashes dock icon |
+| Windows | `raise_()` + `activateWindow()` work; `alert()` flashes taskbar |
+
 ### Keyboard shortcuts
 
 | Key | Action |
