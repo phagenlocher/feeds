@@ -13,7 +13,6 @@ _TAG_PADDING_H: int = 8
 _TAG_PADDING_V: int = 4
 _TAG_MARGIN: int = 6
 _TAG_RADIUS: int = 5
-_DEFAULT_TAG_COLOR: str = "#888888"
 
 
 class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
@@ -50,7 +49,7 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
         muted_color = (
             option.palette.color(QtGui.QPalette.ColorRole.HighlightedText)
             if selected
-            else QtGui.QColor("#888888")
+            else option.palette.color(QtGui.QPalette.ColorRole.PlaceholderText)
         )
 
         tags: list[tuple[str, str]] | None = index.data(TagsRole)
@@ -116,7 +115,7 @@ class TwoLineRenderer(QtWidgets.QStyledItemDelegate):
                 color = (
                     QtGui.QColor(color_hex)
                     if color_hex
-                    else QtGui.QColor(_DEFAULT_TAG_COLOR)
+                    else option.palette.color(QtGui.QPalette.ColorRole.PlaceholderText)
                 )
                 tag_width = fm.horizontalAdvance(tag_name) + _TAG_PADDING_H * 2
                 if tag_width > remaining:

@@ -34,6 +34,7 @@ def main() -> None:
     )
 
     qapp: QtWidgets.QApplication = QtWidgets.QApplication(sys.argv)
+    qapp.setPalette(qapp.style().standardPalette())
 
     window: FeedsApp | None = None
 

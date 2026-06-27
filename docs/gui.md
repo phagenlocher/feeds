@@ -1,7 +1,9 @@
 # GUI Architecture
 
 feeds uses **PySide6** (Qt for Python) for its desktop GUI. The UI is
-built entirely programmatically; no `.ui` files or QSS stylesheets.
+built entirely programmatically; no `.ui` files. All styling uses
+palette colors from the system theme; no hardcoded theme colors or QSS
+stylesheets.
 
 ```
 FeedsApp (QMainWindow)                [feeds/app.py:27]
@@ -163,7 +165,8 @@ A `QTreeWidget` subclass used by `FeedTreePane`. Features:
 - **Animations**: `setAnimated(True)` for smooth expand/collapse.
 - **Hidden header**: no column headers displayed.
 - **Selection styling**: handled by the `TwoLineRenderer` delegate,
-  which uses palette highlight colors.
+  which uses palette highlight and placeholder-text colors for full
+  theme awareness.
 
 ### Custom data roles (widgets.py)
 

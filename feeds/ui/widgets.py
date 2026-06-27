@@ -31,9 +31,6 @@ class FeedTreeWidget(QtWidgets.QTreeWidget):
         super().__init__(parent)
         self._font_size: int = 0
         self.setHeaderHidden(True)
-        self.setStyleSheet(
-            "QTreeWidget::item:selected { background-color: #3478bf; color: white; }"
-        )
         self.setMouseTracking(True)
         self.viewport().installEventFilter(self)
         self.setAnimated(True)

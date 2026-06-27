@@ -414,7 +414,11 @@ class ManageTagsDialog(QtWidgets.QDialog):
         tag = self._selected_tag()
         if tag is None:
             return
-        current = QtGui.QColor(self._tag_colors.get(tag, "#888888"))
+        tag_color = self._tag_colors.get(tag)
+        if tag_color is not None:
+            current = QtGui.QColor(tag_color)
+        else:
+            current = self.palette().color(QtGui.QPalette.ColorRole.PlaceholderText)
         color = QtWidgets.QColorDialog.getColor(current, self, f"Color for '{tag}'")
         if not color.isValid():
             return
