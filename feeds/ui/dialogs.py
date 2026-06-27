@@ -1,6 +1,8 @@
 """Feed-related dialogs."""
 
+import colorsys
 import logging
+from hashlib import md5
 from urllib.parse import urlparse
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -9,33 +11,42 @@ from feeds.models.feed import FeedReader
 
 log: logging.Logger = logging.getLogger(__name__)
 
-_DEFAULT_TAG_COLORS: list[str] = [
-    "#e06c75",
-    "#61afef",
-    "#98c379",
-    "#e5c07b",
-    "#c678dd",
-    "#56b6c2",
-    "#d19a66",
-    "#7ec8e3",
-    "#b9e6a0",
-    "#f0c674",
-    "#b294bb",
-    "#81a2be",
-]
+
+def _to_pastel(
+    r: int,
+    g: int,
+    b: int,
+    saturation_scale: float = 0.5,
+    target_lightness: float = 0.85,
+) -> tuple[int, int, int]:
+    """Turn a color (*r*, *g*, *b*) more 'pastel'."""
+    h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)  # noqa: E741
+    s = s * saturation_scale
+    l = l + (target_lightness - l) * 0.8  # noqa: E741
+    r2, g2, b2 = colorsys.hls_to_rgb(h, l, s)
+    return round(r2 * 255), round(g2 * 255), round(b2 * 255)
+
+
+def _default_color_for_tag(tag: str) -> str:
+    """Return a deterministic default color for *tag*.
+
+    The resulting string has the format '#rrggbb'.
+    """
+    r, g, b, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, _ = md5(
+        tag.encode()
+    ).digest()
+    r ^= x1 ^ x4 ^ x7 ^ x10
+    g ^= x2 ^ x5 ^ x8 ^ x11
+    b ^= x3 ^ x6 ^ x9 ^ x12
+    pr, pg, pb = _to_pastel(r, g, b, target_lightness=0.65)
+    return f"#{pr:02x}{pg:02x}{pb:02x}"
 
 
 def _pick_tag_color(tag: str, tag_colors: dict[str, str]) -> str:
     """Return the color for *tag*, assigning a default if missing."""
     if tag in tag_colors:
         return tag_colors[tag]
-    used = set(tag_colors.values())
-    for c in _DEFAULT_TAG_COLORS:
-        if c not in used:
-            tag_colors[tag] = c
-            return c
-    idx = len(tag_colors) % len(_DEFAULT_TAG_COLORS)
-    color = _DEFAULT_TAG_COLORS[idx]
+    color = _default_color_for_tag(tag)
     tag_colors[tag] = color
     return color
 
