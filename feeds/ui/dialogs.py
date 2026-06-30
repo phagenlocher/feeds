@@ -12,34 +12,21 @@ from feeds.models.feed import FeedReader
 log: logging.Logger = logging.getLogger(__name__)
 
 
-def _to_pastel(
-    r: int,
-    g: int,
-    b: int,
-    saturation_scale: float = 0.5,
-    target_lightness: float = 0.85,
-) -> tuple[int, int, int]:
-    """Turn a color (*r*, *g*, *b*) more 'pastel'."""
-    h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)  # noqa: E741
-    s = s * saturation_scale
-    l = l + (target_lightness - l) * 0.8  # noqa: E741
-    r2, g2, b2 = colorsys.hls_to_rgb(h, l, s)
-    return round(r2 * 255), round(g2 * 255), round(b2 * 255)
-
-
 def _default_color_for_tag(tag: str) -> str:
     """Return a deterministic default color for *tag*.
 
     The resulting string has the format '#rrggbb'.
     """
-    r, g, b, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, _ = md5(
+    x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, _ = md5(
         tag.encode()
     ).digest()
-    r ^= x1 ^ x4 ^ x7 ^ x10
-    g ^= x2 ^ x5 ^ x8 ^ x11
-    b ^= x3 ^ x6 ^ x9 ^ x12
-    pr, pg, pb = _to_pastel(r, g, b, target_lightness=0.65)
-    return f"#{pr:02x}{pg:02x}{pb:02x}"
+    h = (x1 ^ x4 ^ x7 ^ x10 ^ x13) / 255
+    sf = (x2 ^ x5 ^ x8 ^ x11 ^ x14) / 255
+    lf = (x3 ^ x6 ^ x9 ^ x12 ^ x15) / 255
+    s = (0.2 * sf) + 0.6  # normalize saturation to 60-80%
+    l = (0.2 * lf) + 0.55  # normalize lightness between 55-75% # noqa: E741
+    r, g, b = colorsys.hls_to_rgb(h, l, s)
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
 def _pick_tag_color(tag: str, tag_colors: dict[str, str]) -> str:
