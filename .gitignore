@@ -36,3 +36,6 @@ scratch/
 
 # AI tooling
 .opencode/
+
+# Editor
+.zed/
