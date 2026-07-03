@@ -218,7 +218,7 @@ def _try_common_paths(url: str) -> list[tuple[str, str]]:
                 parsed_feed: feedparser.FeedParserDict = feedparser.parse(resp.content)
                 if parsed_feed.version:
                     feed_data = parsed_feed.feed
-                    title = feed_data.get("title", "")
+                    title = feed_data.get("title", "")  # type: ignore[attr-defined]
                     feeds.append((resp.url, title or feed_url))
             except requests.RequestException:
                 continue
@@ -244,6 +244,105 @@ def _get_with_retry(
     )(requests.get)(
         url, timeout=timeout, headers=headers, allow_redirects=allow_redirects
     )
+
+
+def _try_platform_handlers(url: str) -> list[tuple[str, str]] | None:
+    """Try platform-specific feed URL handlers in priority order.
+
+    Runs the Substack, Medium, Reddit, and YouTube pre-handlers
+    (which construct feed URLs from known platform URL patterns,
+    bypassing HTTP fetches).  Returns the first non-empty result,
+    or ``None`` if no handler matched.
+
+    Args:
+        url: The URL to dispatch to platform handlers.
+
+    Returns:
+        ``[(feed_url, title), ...]`` from the first matching
+        handler, or ``None`` if no handler recognised the URL.
+    """
+    for handler in (try_substack, try_medium, try_reddit, try_youtube):
+        feeds = handler(url)
+        if feeds:
+            log.debug("%s handler returned %d feed(s)", handler.__name__, len(feeds))
+            return feeds
+    return None
+
+
+def _extract_feeds_from_response(
+    resp: requests.Response, original_url: str
+) -> list[tuple[str, str]]:
+    """Extract feed URLs from a fetched HTTP response.
+
+    Tries, in order: direct feed parsing, HTML ``<link>`` tag
+    scanning, HTTP ``Link`` header parsing, and common-path
+    probing.  De-duplicates by feed URL.
+
+    Args:
+        resp: The fetched HTTP response (already status-checked).
+        original_url: The URL that was requested (used as the feed
+            URL when the response itself is a feed).
+
+    Returns:
+        ``[(feed_url, title), ...]`` of discovered feeds.
+    """
+    feeds: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    def _add(href: str, title: str) -> None:
+        if href not in seen:
+            seen.add(href)
+            feeds.append((href, title))
+
+    # Method 1: try to parse as a feed directly
+    parsed: feedparser.FeedParserDict = feedparser.parse(resp.content)
+    if parsed.version:
+        log.debug("%s is a feed directly (version=%s)", original_url, parsed.version)
+        feed = parsed.feed
+        title = feed.get("title", "")  # type: ignore[attr-defined]
+        _add(original_url, title or original_url)
+        return feeds  # It IS a feed; skip remaining methods.
+    log.debug("%s is not a feed (version=%s)", original_url, parsed.version)
+
+    content_type: str = resp.headers.get("Content-Type", "")
+    is_html = "text/html" in content_type or "application/xhtml+xml" in content_type
+
+    # Method 2: HTML <link> tags
+    if is_html:
+        log.debug("scanning HTML <link> tags for feed references")
+        finder: _FeedLinkFinder = _FeedLinkFinder()
+        finder.feed(resp.text)
+        base_url = urljoin(resp.url, finder.base_href) if finder.base_href else resp.url
+        log.debug("found %d feed(s) via <link> tags", len(finder.feeds))
+        for href, title in finder.feeds:
+            log.debug("  <link> feed: %s (%s)", href, title)
+            _add(urljoin(base_url, href), title)
+    else:
+        log.debug("content type is %s, skipping HTML scan", content_type)
+
+    # Method 3: HTTP Link headers
+    link_header: str = resp.headers.get("Link", "")
+    if link_header:
+        log.debug("parsing HTTP Link headers")
+        for href, title in _parse_link_header(link_header, resp.url):
+            log.debug("  Link header feed: %s (%s)", href, title)
+            _add(href, title)
+    else:
+        log.debug("no Link headers found")
+
+    # Method 4: common path probing (only for HTML)
+    if not feeds and is_html:
+        log.debug("no feeds found yet, probing common paths on %s", resp.url)
+        path_feeds = _try_common_paths(resp.url)
+        log.debug("common path probing returned %d feed(s)", len(path_feeds))
+        for href, title in path_feeds:
+            _add(href, title)
+    elif feeds:
+        log.debug("skipping common path probing (already found %d feed(s))", len(feeds))
+    else:
+        log.debug("skipping common path probing (content type %s)", content_type)
+
+    return feeds
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,30 +438,21 @@ class FeedReader:
     def _discover_feed_urls(url: str) -> list[tuple[str, str]]:
         """Discover feed URLs from *url* using multiple methods.
 
-        Uses the following methods, in order:
+        Pipeline (in order):
 
-        1. **Platform pre-handlers** — specialised handlers for
-           Substack, Medium, Reddit, and YouTube that run **before**
-           any HTTP request.  They construct the feed URL directly
-           from known platform URL patterns, bypassing slow page
-           fetches and consent walls.
+        1. **Platform pre-handlers** — Substack, Medium, Reddit,
+           YouTube handlers construct feed URLs from known platform
+           URL patterns **before** any HTTP request
+           (:func:`_try_platform_handlers`).
 
-        2. **Direct feed check** — tries to parse the response as a
-           feed (RSS, Atom, JSON Feed) using ``feedparser``.  If the
-           URL is itself a feed, it is returned immediately.
+        2. **HTTP fetch** of *url* with retry.
 
-        3. **HTML ``<link>`` tags** — scans the HTML for
-           ``<link rel="alternate">`` with a feed MIME type
-           (``application/rss+xml``, ``application/atom+xml``,
-           ``application/feed+json``).  Supports multi-value ``rel``
-           attributes and ``<base href>`` for relative URL resolution.
+        3. **Response extraction** — direct feed parsing, HTML
+           ``<link>`` tags, HTTP ``Link`` headers, and common-path
+           probing (:func:`_extract_feeds_from_response`).
 
-        4. **HTTP ``Link`` headers** — parses ``Link`` response
-           headers (RFC 5988) referencing alternate feeds.
-
-        5. **Common path probing** — probes well-known feed paths
-           (``/feed/``, ``/feed.xml``, ``/index.xml``, etc.) as a
-           last resort when all other methods fail.
+        See the extraction helpers' docstrings for details on each
+        response-scanning method.
 
         Args:
             url: The URL to discover feeds from.
@@ -370,30 +460,9 @@ class FeedReader:
         Returns:
             ``[(feed_url, title), ...]``, or ``[]`` if nothing was found.
         """
-        feeds = try_substack(url)
-        if feeds:
-            log.debug("Substack handler returned %d feed(s)", len(feeds))
-            return feeds
-        feeds = try_medium(url)
-        if feeds:
-            log.debug("Medium handler returned %d feed(s)", len(feeds))
-            return feeds
-        feeds = try_reddit(url)
-        if feeds:
-            log.debug("Reddit handler returned %d feed(s)", len(feeds))
-            return feeds
-        feeds = try_youtube(url)
-        if feeds:
-            log.debug("YouTube handler returned %d feed(s)", len(feeds))
-            return feeds
-
-        feeds: list[tuple[str, str]] = []
-        seen: set[str] = set()
-
-        def _add(href: str, title: str) -> None:
-            if href not in seen:
-                seen.add(href)
-                feeds.append((href, title))
+        platform_feeds = _try_platform_handlers(url)
+        if platform_feeds:
+            return platform_feeds
 
         try:
             resp: requests.Response = _get_with_retry(
@@ -407,59 +476,7 @@ class FeedReader:
             log.warning("Failed to fetch %s for feed discovery", url)
             return []
 
-        # Method 1: try to parse as a feed directly
-        parsed: feedparser.FeedParserDict = feedparser.parse(resp.content)
-        if parsed.version:
-            log.debug("%s is a feed directly (version=%s)", url, parsed.version)
-            feed = parsed.feed
-            title = feed.get("title", "")
-            _add(url, title or url)
-            return feeds  # It IS a feed; skip remaining methods.
-        log.debug("%s is not a feed (version=%s)", url, parsed.version)
-
-        content_type: str = resp.headers.get("Content-Type", "")
-        is_html = "text/html" in content_type or "application/xhtml+xml" in content_type
-
-        # Method 2: HTML <link> tags
-        if is_html:
-            log.debug("scanning HTML <link> tags for feed references")
-            finder: _FeedLinkFinder = _FeedLinkFinder()
-            finder.feed(resp.text)
-            base_url = (
-                urljoin(resp.url, finder.base_href) if finder.base_href else resp.url
-            )
-            log.debug("found %d feed(s) via <link> tags", len(finder.feeds))
-            for href, title in finder.feeds:
-                log.debug("  <link> feed: %s (%s)", href, title)
-                _add(urljoin(base_url, href), title)
-        else:
-            log.debug("content type is %s, skipping HTML scan", content_type)
-
-        # Method 3: HTTP Link headers
-        link_header: str = resp.headers.get("Link", "")
-        if link_header:
-            log.debug("parsing HTTP Link headers")
-            for href, title in _parse_link_header(link_header, resp.url):
-                log.debug("  Link header feed: %s (%s)", href, title)
-                _add(href, title)
-        else:
-            log.debug("no Link headers found")
-
-        # Method 4: common path probing (only for HTML)
-        if not feeds and is_html:
-            log.debug("no feeds found yet, probing common paths on %s", resp.url)
-            path_feeds = _try_common_paths(resp.url)
-            log.debug("common path probing returned %d feed(s)", len(path_feeds))
-            for href, title in path_feeds:
-                _add(href, title)
-        elif feeds:
-            log.debug(
-                "skipping common path probing (already found %d feed(s))", len(feeds)
-            )
-        else:
-            log.debug("skipping common path probing (content type %s)", content_type)
-
-        return feeds
+        return _extract_feeds_from_response(resp, url)
 
     def discover_feeds(self, url: str) -> list[tuple[str, str]]:
         """Discover feed URLs from *url*.
@@ -664,7 +681,7 @@ class FeedReader:
             tag: The tag name to set.
         """
         log.info("setting tag '%s' on feed %s", tag, feed_url)
-        self.reader.set_tag(feed_url, tag, True)
+        self.reader.set_tag(feed_url, tag)
 
     def remove_feed_tag(self, feed_url: str, tag: str) -> None:
         """Remove a tag from a feed.
@@ -685,7 +702,7 @@ class FeedReader:
         """
         log.info("renaming tag '%s' to '%s'", old, new)
         for feed in self.reader.get_feeds(tags=[old]):
-            self.reader.set_tag(feed.url, new, True)
+            self.reader.set_tag(feed.url, new)
             self.reader.delete_tag(feed.url, old)
 
     def delete_tag(self, tag: str) -> None:
