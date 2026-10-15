@@ -1,0 +1,39 @@
+[package]
+name = "feeds-core"
+description = "Core feed storage, parsing, discovery and update logic for feeds"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+name = "feeds_core"
+path = "src/lib.rs"
+
+[dependencies]
+feed-rs.workspace = true
+rusqlite.workspace = true
+reqwest.workspace = true
+scraper.workspace = true
+opml.workspace = true
+backon.workspace = true
+md5.workspace = true
+directories.workspace = true
+tokio.workspace = true
+futures.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+url.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+httpmock = "0.8"
+insta = { version = "1.43", features = ["json"] }
+tempfile = "3"

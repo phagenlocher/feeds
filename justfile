@@ -3,49 +3,52 @@ list-recipes:
     @just --list
 
 
-_build-venv:
-    uv venv --python 3.11 --seed .build-venv
+# Install frontend dependencies (always via corepack's pnpm)
+ui-install:
+    cd crates/feeds-app/ui && corepack pnpm install
 
-# Build static binary in dist/
-build suffix="": _build-venv
-    .build-venv/bin/pip install -q -e . 'nuitka[onefile]==4.1.2'
-    # Patch vendored feedparser __code__ assignment for Nuitka compatibility
-    .build-venv/bin/python scripts/patch-feedparser.py
-    # Patch reader _sqlite_utils dict-comp in finally for Nuitka 4.1 compat
-    .build-venv/bin/python scripts/patch-sqlite-utils.py
-    .build-venv/bin/nuitka \
-      --onefile \
-      --enable-plugin=pyside6 \
-      --include-package=reader \
-      --noinclude-pytest-mode=nofollow \
-      --output-filename=feeds{{suffix}} \
-      --output-dir=dist \
-      --deployment \
-      --python-flag=-m \
-      --lto=yes \
-      feeds
-    rm -rf dist/*.build dist/*.dist dist/*.onefile-build
+# Build the frontend into crates/feeds-app/ui/dist
+ui-build: ui-install
+    cd crates/feeds-app/ui && corepack pnpm build
 
-# Print licenses of project dependencies (excluding dev dependencies) with additional arguments for pip-licenses
-licenses *args: _build-venv
-    uv export --no-dev --no-editable --frozen --no-emit-project -o requirements.txt
-    .build-venv/bin/pip install -r requirements.txt
-    .build-venv/bin/pip install pip-licenses
-    .build-venv/bin/pip-licenses {{args}}
-    rm requirements.txt
-
-# Build and install a static binary to ~/.local/bin
-install: build
-    cp dist/feeds ~/.local/bin/
+# Alias ensuring the embedded frontend exists before cargo builds the app
+_ui: ui-build
 
 # Format all files
 format:
-    uv run ruff format
+    cargo fmt --all
 
 # Lint all files
-lint:
-    uv run ruff check
+lint: _ui
+    cargo clippy --workspace --all-targets -- -D warnings
 
-# Run feeds with given arguments
-run *args:
-    uv run python -m feeds {{args}}
+# Run all tests
+test: _ui
+    cargo test --workspace
+
+# Build a release binary (workspace)
+build: _ui
+    cargo build --release --workspace --features feeds-app/custom-protocol
+
+# Build all Tauri bundles (requires the tauri CLI)
+bundle: ui-build
+    cd crates/feeds-app && cargo tauri build
+
+# Build a portable Linux AppImage (installs the tauri CLI on first use)
+appimage: ui-build
+    @command -v cargo-tauri >/dev/null 2>&1 || cargo install tauri-cli
+    cd crates/feeds-app && cargo tauri build --bundles appimage
+    @echo "AppImage: target/release/bundle/appimage/"
+
+# Build and install the app binary to ~/.local/bin
+install: build
+    cp target/release/feeds-app ~/.local/bin/feeds
+
+# Run the app with given arguments
+run *args: _ui
+    cargo run -p feeds-app --features custom-protocol -- {{args}}
+
+# Regenerate THIRD-PARTY-NOTICES (installs cargo-about on first use)
+notices:
+    @command -v cargo-about >/dev/null 2>&1 || cargo install cargo-about --locked --features cli
+    python3 scripts/gen-notices.py

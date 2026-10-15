@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = ["crates/feeds-core", "crates/feeds-app"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.82"
+license = "GPL-3.0-only"
+repository = "https://github.com/phagenlocher/feeds"
+authors = ["phagenlocher"]
+
+[workspace.dependencies]
+feed-rs = "3.0"
+rusqlite = { version = "0.40", features = ["bundled"] }
+reqwest = { version = "0.13", default-features = false, features = [
+    "rustls",
+    "rustls-native-certs",
+    "gzip",
+    "brotli",
+    "deflate",
+    "json",
+] }
+scraper = "0.27"
+opml = "1.1"
+backon = "1.6"
+md5 = "0.8"
+directories = "6.0"
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "sync"] }
+futures = "0.3"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+url = "2"
+regex = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

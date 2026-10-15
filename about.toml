@@ -1,0 +1,50 @@
+# cargo-about configuration — https://embarkstudios.github.io/cargo-about/
+#
+# Regenerate the third-party notices with the just recipes:
+#
+#     just notices        # THIRD-PARTY-NOTICES
+#
+# The list is rendered from templates/about.hbs (scripts/gen-notices.py).
+
+# Licenses we accept, in priority order. When a crate offers a choice
+# (`MIT OR Apache-2.0`) the first license in this list that satisfies the
+# expression is used.
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "0BSD",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+    "Apache-2.0 WITH LLVM-exception",
+    "LGPL-2.1-or-later",
+    "OpenSSL",
+]
+
+# Built-in clarifications for crates with unusual/ambiguous license metadata.
+workarounds = [
+    "ring",
+    "rustls",
+]
+
+# Our own workspace crates are GPL-3.0-only and are not third-party
+# dependencies; they are marked `publish = false` and skipped here.
+private = { ignore = true }
+
+# stringmetrics 2.2.2 ships no SPDX `license` field; its bundled LICENSE file
+# is the Apache License, Version 2.0.
+[stringmetrics.clarify]
+license = "Apache-2.0"
+
+[[stringmetrics.clarify.files]]
+path = "LICENSE"
+license = "Apache-2.0"
+checksum = "408bbc4d10bdf74d8c9b74b64ea4910603257e24133da18edc4d16198e3b4010"

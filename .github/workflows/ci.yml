@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+          # AppIndicator is only needed for the optional tray-icon feature, which
+          # is not enabled. The package was renamed in Ubuntu 24.04, so install
+          # the Ayatana fork and do not fail the build if it is unavailable.
+          sudo apt-get install -y libayatana-appindicator3-dev || true
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            crates/feeds-core
+            crates/feeds-app
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Use the packageManager pin in crates/feeds-app/ui/package.json.
+          package_json_file: crates/feeds-app/ui/package.json
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('crates/feeds-app/ui/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install frontend dependencies
+        working-directory: crates/feeds-app/ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: crates/feeds-app/ui
+        run: pnpm build
+
+      # Mirrors the `just format`, `just lint` and `just test` recipes. The
+      # frontend has to be built first: the Tauri macro embeds ui/dist.
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace

@@ -10,37 +10,101 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            target: linux-x86_64
-          - os: ubuntu-24.04-arm
-            target: linux-aarch64
-          - os: macos-15-intel
-            target: macos-x86_64
-          - os: macos-latest
-            target: macos-aarch64
-    runs-on: ${{ matrix.os }}
+          - platform: ubuntu-24.04
+            args: "--bundles deb,rpm,appimage"
+          - platform: ubuntu-24.04-arm
+            args: "--bundles deb,rpm,appimage"
+    runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+          # AppIndicator is only needed for the optional tray-icon feature, which
+          # is not enabled. The package was renamed in Ubuntu 24.04, so install
+          # the Ayatana fork and do not fail the build if it is unavailable.
+          sudo apt-get install -y libayatana-appindicator3-dev || true
+          # No FUSE needed: the AppImage bundler extracts linuxdeploy instead of
+          # running it (APPIMAGE_EXTRACT_AND_RUN=1).
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.11"
-      - uses: extractions/setup-just@v4
-      - run: just build "-${{ matrix.target }}"
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v3
+          node-version: "22"
+
+      - uses: pnpm/action-setup@v4
         with:
-          files: dist/feeds-*
+          # Use the packageManager pin in crates/feeds-app/ui/package.json.
+          package_json_file: crates/feeds-app/ui/package.json
+
+      - name: Install frontend dependencies
+        working-directory: crates/feeds-app/ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release tag matches app version
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cargo_version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+          tauri_version=$(python3 -c 'import json; print(json.load(open("crates/feeds-app/tauri.conf.json"))["version"])')
+          ui_version=$(python3 -c 'import json; print(json.load(open("crates/feeds-app/ui/package.json"))["version"])')
+          tag="${TAG#v}"
+          mismatch=0
+          if [ "$cargo_version" != "$tauri_version" ]; then
+            echo "::error::Cargo.toml version '$cargo_version' does not match tauri.conf.json version '$tauri_version'"
+            mismatch=1
+          fi
+          if [ "$tauri_version" != "$ui_version" ]; then
+            echo "::error::tauri.conf.json version '$tauri_version' does not match ui/package.json version '$ui_version'"
+            mismatch=1
+          fi
+          if [ "$tag" != "$cargo_version" ]; then
+            echo "::error::Release tag '$TAG' does not match app version '$cargo_version'"
+            mismatch=1
+          fi
+          if [ "$mismatch" -ne 0 ]; then
+            exit 1
+          fi
+          echo "Release tag $TAG and all three app versions match ($cargo_version)"
+
+      - name: Build frontend
+        working-directory: crates/feeds-app/ui
+        run: pnpm build
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: crates/feeds-app
+          # Attach the bundles (deb/rpm/AppImage) to the release that triggered
+          # this run. Without releaseId/tagName the action only builds and never
+          # uploads anything.
+          releaseId: ${{ github.event.release.id }}
+          retryAttempts: 2
+          args: ${{ matrix.args }}
 
   upload-license-files:
     needs: build
+    # Manual runs only build; there is no release to attach the files to.
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - name: Upload License Files
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name }}
           files: |
             LICENSE
             THIRD-PARTY-NOTICES

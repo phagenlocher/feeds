@@ -1,0 +1,46 @@
+[package]
+name = "feeds-app"
+description = "Tauri desktop shell for feeds"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+default-run = "feeds-app"
+
+[lib]
+name = "feeds_app"
+crate-type = ["rlib"]
+
+[features]
+# Production marker: makes Tauri serve the embedded frontend assets instead of
+# pointing the webview at a dev server. Do not remove.
+custom-protocol = ["tauri/custom-protocol"]
+
+[[bin]]
+name = "feeds-app"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+feeds-core = { path = "../feeds-core" }
+chrono.workspace = true
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Used to scale the native GTK menu bar with the font zoom setting.
+gtk = "0.18"

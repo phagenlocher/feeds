@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for the feeds main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:window:allow-show",
+    "opener:default",
+    "dialog:default",
+    "clipboard-manager:default"
+  ]
+}
