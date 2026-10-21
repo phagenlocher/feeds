@@ -19,7 +19,7 @@ jobs:
             args: "--bundles deb,rpm,appimage"
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux dependencies
         run: |
@@ -38,11 +38,11 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           # Use the packageManager pin in crates/feeds-app/ui/package.json.
           package_json_file: crates/feeds-app/ui/package.json
@@ -98,11 +98,11 @@ jobs:
     needs: build
     # Manual runs only build; there is no release to attach the files to.
     if: github.event_name == 'release'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Upload License Files
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name }}
           files: |
