@@ -1,7 +1,7 @@
 //! Tauri commands exposed to the frontend.
 
 use chrono::{DateTime, Utc};
-use feeds_core::{newest_entry_date, Entry, Feed, Settings, TagFilter};
+use feeds_core::{newest_entry_date, DiscoveredFeed, Entry, Feed, Settings, TagFilter};
 use serde::Serialize;
 use tauri::State;
 
@@ -24,15 +24,6 @@ pub struct FeedNode {
     pub entries: Vec<Entry>,
     /// Publication date of the newest entry, shown in the tree.
     pub newest_date: Option<DateTime<Utc>>,
-}
-
-/// A discovered feed candidate.
-#[derive(Debug, Clone, Serialize)]
-pub struct Discovered {
-    /// Feed URL.
-    pub url: String,
-    /// Feed title.
-    pub title: String,
 }
 
 /// Return the whole tree (feeds + entries), optionally tag-filtered.
@@ -124,12 +115,8 @@ pub fn prune_feed(state: State<'_, AppState>, feed: String, n: i64) -> Result<us
 pub async fn discover_feeds(
     state: State<'_, AppState>,
     url: String,
-) -> Result<Vec<Discovered>, String> {
-    let feeds = state.feeds.discover_feeds(&url).await.map_err(err)?;
-    Ok(feeds
-        .into_iter()
-        .map(|(url, title)| Discovered { url, title })
-        .collect())
+) -> Result<Vec<DiscoveredFeed>, String> {
+    state.feeds.discover_feeds(&url).await.map_err(err)
 }
 
 /// Fetch and store a single feed.

@@ -4,9 +4,11 @@
 
 use url::Url;
 
-/// Parse a `Link` header value, returning `(url, title)` for every link
-/// whose `rel` is `alternate` and whose `type` is a known feed MIME type.
-pub fn parse_link_header(value: &str, base_url: &str) -> Vec<(String, String)> {
+use crate::models::DiscoveredFeed;
+
+/// Parse a `Link` header value, returning one [`DiscoveredFeed`] for every
+/// link whose `rel` is `alternate` and whose `type` is a known feed MIME type.
+pub fn parse_link_header(value: &str, base_url: &str) -> Vec<DiscoveredFeed> {
     let base = Url::parse(base_url).ok();
     let mut out = Vec::new();
 
@@ -48,7 +50,10 @@ pub fn parse_link_header(value: &str, base_url: &str) -> Vec<(String, String)> {
             } else {
                 title
             };
-            out.push((resolved, title));
+            out.push(DiscoveredFeed {
+                url: resolved,
+                title,
+            });
         }
     }
 
@@ -127,10 +132,10 @@ mod tests {
         let links = parse_link_header(header, "https://example.com/blog");
         assert_eq!(
             links,
-            vec![(
-                "https://example.com/feed.xml".to_string(),
-                "RSS".to_string()
-            )]
+            vec![DiscoveredFeed {
+                url: "https://example.com/feed.xml".to_string(),
+                title: "RSS".to_string(),
+            }]
         );
     }
 
@@ -148,7 +153,7 @@ mod tests {
         );
         let links = parse_link_header(header, "https://example.com/");
         assert_eq!(links.len(), 2);
-        assert_eq!(links[0].0, "https://example.com/a.xml");
-        assert_eq!(links[1].0, "https://example.com/rss.xml");
+        assert_eq!(links[0].url, "https://example.com/a.xml");
+        assert_eq!(links[1].url, "https://example.com/rss.xml");
     }
 }

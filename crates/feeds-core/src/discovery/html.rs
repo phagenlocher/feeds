@@ -4,12 +4,13 @@ use scraper::{Html, Selector};
 use url::Url;
 
 use super::is_feed_mime;
+use crate::models::DiscoveredFeed;
 
 /// Extract feed links from an HTML document.
 ///
-/// Honours `<base href>` for relative URL resolution. Returns
-/// `(feed_url, title)` pairs in document order.
-pub fn extract_feed_links(html: &str, page_url: &str) -> Vec<(String, String)> {
+/// Honours `<base href>` for relative URL resolution. Returns one
+/// [`DiscoveredFeed`] per match, in document order.
+pub fn extract_feed_links(html: &str, page_url: &str) -> Vec<DiscoveredFeed> {
     let document = Html::parse_document(html);
 
     // Resolve the base URL (<base href> if present, else the page URL).
@@ -51,7 +52,10 @@ pub fn extract_feed_links(html: &str, page_url: &str) -> Vec<(String, String)> {
             .attr("title")
             .map(str::to_string)
             .unwrap_or_else(|| resolved.clone());
-        feeds.push((resolved, title));
+        feeds.push(DiscoveredFeed {
+            url: resolved,
+            title,
+        });
     }
 
     feeds
@@ -72,9 +76,12 @@ mod tests {
         assert_eq!(feeds.len(), 2);
         assert_eq!(
             feeds[0],
-            ("https://example.com/feed".to_string(), "RSS".to_string())
+            DiscoveredFeed {
+                url: "https://example.com/feed".to_string(),
+                title: "RSS".to_string(),
+            }
         );
-        assert_eq!(feeds[1].0, "https://example.com/atom.xml");
+        assert_eq!(feeds[1].url, "https://example.com/atom.xml");
     }
 
     #[test]
@@ -84,7 +91,7 @@ mod tests {
             <link rel="alternate" type="application/rss+xml" href="feed.xml">
         </head></html>"#;
         let feeds = extract_feed_links(html, "https://example.com/");
-        assert_eq!(feeds[0].0, "https://cdn.example.com/feed.xml");
+        assert_eq!(feeds[0].url, "https://cdn.example.com/feed.xml");
     }
 
     #[test]

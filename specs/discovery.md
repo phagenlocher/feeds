@@ -112,7 +112,8 @@ current page's parent directory
 **Scenario: a candidate is validated**
 **Given** a candidate feed URL
 **When** `discovery::utils::validate_feed` fetches it
-**Then** it returns `[(final_url, title)]` if `parse::feed_title` recognises it
+**Then** it returns a one-element list containing a `DiscoveredFeed { url,
+title }` (the final URL and feed title) if `parse::feed_title` recognises it
 **And** otherwise it returns `[]`
 
 ### Add Feed UI integration

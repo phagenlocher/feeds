@@ -21,8 +21,8 @@ async fn detects_a_direct_feed() {
     let url = server.url("/feed.xml");
     let feeds = discovery::discover_feeds(&client(), &url).await.unwrap();
     assert_eq!(feeds.len(), 1);
-    assert_eq!(feeds[0].0, url);
-    assert_eq!(feeds[0].1, "Direct");
+    assert_eq!(feeds[0].url, url);
+    assert_eq!(feeds[0].title, "Direct");
 }
 
 #[tokio::test]
@@ -40,8 +40,8 @@ async fn detects_html_link_tags() {
     let url = server.url("/blog");
     let feeds = discovery::discover_feeds(&client(), &url).await.unwrap();
     assert_eq!(feeds.len(), 1);
-    assert_eq!(feeds[0].0, server.url("/feed.xml"));
-    assert_eq!(feeds[0].1, "RSS");
+    assert_eq!(feeds[0].url, server.url("/feed.xml"));
+    assert_eq!(feeds[0].title, "RSS");
 }
 
 #[tokio::test]
@@ -61,7 +61,7 @@ async fn detects_link_header() {
     let url = server.url("/page");
     let feeds = discovery::discover_feeds(&client(), &url).await.unwrap();
     assert_eq!(feeds.len(), 1);
-    assert_eq!(feeds[0].0, server.url("/feed.xml"));
+    assert_eq!(feeds[0].url, server.url("/feed.xml"));
 }
 
 #[tokio::test]
@@ -84,7 +84,7 @@ async fn probes_common_paths_as_fallback() {
     let feeds = discovery::discover_feeds(&client(), &url).await.unwrap();
     assert!(feeds
         .iter()
-        .any(|(href, title)| title == "Probed" && href.ends_with("/feed")));
+        .any(|feed| feed.title == "Probed" && feed.url.ends_with("/feed")));
 }
 
 #[tokio::test]

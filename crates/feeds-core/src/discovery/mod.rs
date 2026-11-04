@@ -111,10 +111,10 @@ async fn extract_feeds_from_response(
             parsed.version
         );
         let title = parsed.title.filter(|t| !t.trim().is_empty());
-        return vec![(
-            original_url.to_string(),
-            title.unwrap_or_else(|| original_url.to_string()),
-        )];
+        return vec![DiscoveredFeed {
+            url: original_url.to_string(),
+            title: title.unwrap_or_else(|| original_url.to_string()),
+        }];
     }
 
     let is_html =
@@ -123,27 +123,27 @@ async fn extract_feeds_from_response(
     // Method 2: HTML <link> tags.
     if is_html {
         let text = String::from_utf8_lossy(&bytes);
-        for (href, title) in html::extract_feed_links(&text, &final_url) {
-            if seen.insert(href.clone()) {
-                feeds.push((href, title));
+        for feed in html::extract_feed_links(&text, &final_url) {
+            if seen.insert(feed.url.clone()) {
+                feeds.push(feed);
             }
         }
     }
 
     // Method 3: HTTP Link headers.
     if let Some(header_value) = link_header {
-        for (href, title) in link_header::parse_link_header(&header_value, &final_url) {
-            if seen.insert(href.clone()) {
-                feeds.push((href, title));
+        for feed in link_header::parse_link_header(&header_value, &final_url) {
+            if seen.insert(feed.url.clone()) {
+                feeds.push(feed);
             }
         }
     }
 
     // Method 4: common-path probing (HTML only, and only if still empty).
     if feeds.is_empty() && is_html {
-        for (href, title) in common_paths::probe_common_paths(client, &final_url).await {
-            if seen.insert(href.clone()) {
-                feeds.push((href, title));
+        for feed in common_paths::probe_common_paths(client, &final_url).await {
+            if seen.insert(feed.url.clone()) {
+                feeds.push(feed);
             }
         }
     }

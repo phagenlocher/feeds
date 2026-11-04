@@ -63,8 +63,14 @@ pub fn newest_entry_date(entries: &[Entry]) -> Option<DateTime<Utc>> {
     entries.iter().find_map(|e| e.date)
 }
 
-/// A discovered feed candidate: `(url, title)`.
-pub type DiscoveredFeed = (String, String);
+/// A discovered feed candidate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiscoveredFeed {
+    /// Feed URL.
+    pub url: String,
+    /// Feed title.
+    pub title: String,
+}
 
 /// A parsed feed ready to be stored.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -71,7 +71,10 @@ pub async fn probe_common_paths(client: &Client, url: &str) -> Vec<DiscoveredFee
                 } else {
                     title
                 };
-                feeds.push((final_url, title));
+                feeds.push(DiscoveredFeed {
+                    url: final_url,
+                    title,
+                });
             }
         }
     }
