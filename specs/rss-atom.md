@@ -356,7 +356,8 @@ tag's color lives in `tag_colors`.
 #### Public API (`Store`)
 
 `add_feed`, `delete_feed`, `feed_exists`, `get_feeds(TagFilter)`,
-`get_visible_feeds(TagFilter)`, `get_feed`, `feed_count`,
+`get_visible_feeds(TagFilter)`, `get_feed_nodes(TagFilter)`, `get_feed`,
+`feed_count`,
 `has_feeds`, `set_feed_user_title`, `get_entries`, `entry_count`, `unread_count`,
 `set_entry_read`, `mark_all_as_read`, `prune_feed`, `get_tags`, `set_tag`,
 `delete_tag`, `tag_keys`, `rename_tag`, `delete_tag_globally`,

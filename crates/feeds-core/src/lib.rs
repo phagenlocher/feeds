@@ -18,7 +18,9 @@ pub mod update;
 
 pub use api::{default_data_dir, Feeds};
 pub use error::{Error, Result};
-pub use models::{newest_entry_date, DiscoveredFeed, Entry, Feed, ParsedEntry, ParsedFeed};
+pub use models::{
+    newest_entry_date, DiscoveredFeed, Entry, Feed, FeedNode, ParsedEntry, ParsedFeed,
+};
 pub use settings::Settings;
 pub use store::{Store, TagFilter, UpdateOutcome};
 pub use tags::TagColors;

@@ -56,6 +56,61 @@ fn feeds_without_a_successful_fetch_are_hidden_from_the_tree() {
 }
 
 #[test]
+fn feed_nodes_bundle_entries_tags_and_unread_state() {
+    let store = store();
+    let url = "https://example.com/feed";
+    store.add_feed(url, true).unwrap();
+
+    let ts = |s: &str| {
+        chrono::DateTime::parse_from_rfc3339(s)
+            .unwrap()
+            .with_timezone(&chrono::Utc)
+    };
+    let entry = |id: &str, published: &str| feeds_core::ParsedEntry {
+        id: id.into(),
+        title: Some(id.into()),
+        link: None,
+        updated: None,
+        published: Some(ts(published)),
+        author: None,
+    };
+    let parsed = feeds_core::ParsedFeed {
+        title: Some("Example".into()),
+        link: None,
+        updated: None,
+        author: None,
+        version: "rss20".into(),
+        entries: vec![
+            entry("old", "2024-01-01T00:00:00Z"),
+            entry("new", "2024-05-05T00:00:00Z"),
+        ],
+    };
+    store
+        .apply_update(url, &parsed, None, chrono::Utc::now())
+        .unwrap();
+    store.set_tag(url, "news").unwrap();
+    store.set_entry_read(url, "new", true).unwrap();
+
+    let nodes = store.get_feed_nodes(TagFilter::All).unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node = &nodes[0];
+    assert_eq!(node.feed.id, url);
+    assert_eq!(node.unread, 1);
+    assert_eq!(node.tags, vec!["news".to_string()]);
+    assert_eq!(node.entries.len(), 2);
+    // Entries are newest first.
+    assert_eq!(node.entries[0].entry_id, "new");
+    assert_eq!(node.newest_date, Some(ts("2024-05-05T00:00:00Z")));
+}
+
+#[test]
+fn feed_nodes_exclude_hidden_feeds() {
+    let store = store();
+    store.add_feed("https://down.example/feed", true).unwrap();
+    assert!(store.get_feed_nodes(TagFilter::All).unwrap().is_empty());
+}
+
+#[test]
 fn add_duplicate_without_exist_ok_errors() {
     let store = store();
     store.add_feed("https://example.com/feed", false).unwrap();

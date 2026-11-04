@@ -9,7 +9,7 @@ use reqwest::Client;
 use crate::discovery;
 use crate::error::Result;
 use crate::http;
-use crate::models::{DiscoveredFeed, Entry, Feed};
+use crate::models::{DiscoveredFeed, Entry, Feed, FeedNode};
 use crate::settings::{self, Settings};
 use crate::store::{Store, TagFilter, UpdateOutcome};
 use crate::{opml, tags, update, USER_AGENT};
@@ -96,6 +96,12 @@ impl Feeds {
     /// successfully).
     pub fn get_visible_feeds(&self, filter: TagFilter) -> Result<Vec<Feed>> {
         self.store.get_visible_feeds(filter)
+    }
+
+    /// List visible feeds with their entries, unread counts, tags and newest
+    /// entry dates, ready for the tree.
+    pub fn get_feed_nodes(&self, filter: TagFilter) -> Result<Vec<FeedNode>> {
+        self.store.get_feed_nodes(filter)
     }
 
     /// Get a single feed.

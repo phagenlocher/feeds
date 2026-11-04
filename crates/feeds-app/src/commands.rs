@@ -1,29 +1,12 @@
 //! Tauri commands exposed to the frontend.
 
-use chrono::{DateTime, Utc};
-use feeds_core::{newest_entry_date, DiscoveredFeed, Entry, Feed, Settings, TagFilter};
-use serde::Serialize;
+use feeds_core::{DiscoveredFeed, FeedNode, Settings, TagFilter};
 use tauri::State;
 
 use crate::state::AppState;
 
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
-}
-
-/// A feed together with its entries and UI metadata.
-#[derive(Debug, Clone, Serialize)]
-pub struct FeedNode {
-    /// The feed itself.
-    pub feed: Feed,
-    /// Unread entry count.
-    pub unread: i64,
-    /// Tag names attached to the feed.
-    pub tags: Vec<String>,
-    /// Entries, newest first.
-    pub entries: Vec<Entry>,
-    /// Publication date of the newest entry, shown in the tree.
-    pub newest_date: Option<DateTime<Utc>>,
 }
 
 /// Return the whole tree (feeds + entries), optionally tag-filtered.
@@ -37,21 +20,7 @@ pub fn get_tree(
         Some("__untagged__") => TagFilter::Untagged,
         Some(tag) => TagFilter::Tags(vec![tag.to_string()]),
     };
-    let feeds = state.feeds.get_visible_feeds(filter).map_err(err)?;
-    let mut nodes = Vec::with_capacity(feeds.len());
-    for feed in feeds {
-        let unread = state.feeds.unread_count(&feed.id).map_err(err)?;
-        let tags = state.feeds.get_feed_tags(&feed.id).map_err(err)?;
-        let entries = state.feeds.get_entries(&feed.id).map_err(err)?;
-        nodes.push(FeedNode {
-            newest_date: newest_entry_date(&entries),
-            feed,
-            unread,
-            tags,
-            entries,
-        });
-    }
-    Ok(nodes)
+    state.feeds.get_feed_nodes(filter).map_err(err)
 }
 
 /// Whether the store contains any feeds.

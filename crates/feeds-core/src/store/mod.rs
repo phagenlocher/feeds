@@ -9,7 +9,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::datetime;
 use crate::error::{Error, Result};
-use crate::models::{Entry, Feed, ParsedFeed};
+use crate::models::{newest_entry_date, Entry, Feed, FeedNode, ParsedFeed};
 
 /// Current on-disk schema version.
 pub const SCHEMA_VERSION: i64 = 1;
@@ -198,6 +198,29 @@ impl Store {
     /// entry.
     pub fn get_visible_feeds(&self, filter: TagFilter) -> Result<Vec<Feed>> {
         self.query_feeds(filter, true)
+    }
+
+    /// List the visible feeds with the data the tree renders.
+    ///
+    /// Each node bundles the feed, its unread count, its tags, its entries
+    /// (newest first) and the publication date of its newest entry. Hidden
+    /// feeds (see [`Store::get_visible_feeds`]) are excluded.
+    pub fn get_feed_nodes(&self, filter: TagFilter) -> Result<Vec<FeedNode>> {
+        let feeds = self.get_visible_feeds(filter)?;
+        let mut nodes = Vec::with_capacity(feeds.len());
+        for feed in feeds {
+            let unread = self.unread_count(&feed.id)?;
+            let tags = self.get_tags(&feed.id)?;
+            let entries = self.get_entries(&feed.id)?;
+            nodes.push(FeedNode {
+                newest_date: newest_entry_date(&entries),
+                feed,
+                unread,
+                tags,
+                entries,
+            });
+        }
+        Ok(nodes)
     }
 
     fn query_feeds(&self, filter: TagFilter, visible_only: bool) -> Result<Vec<Feed>> {

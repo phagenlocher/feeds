@@ -63,6 +63,21 @@ pub fn newest_entry_date(entries: &[Entry]) -> Option<DateTime<Utc>> {
     entries.iter().find_map(|e| e.date)
 }
 
+/// A feed together with the entries and metadata shown in the tree.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FeedNode {
+    /// The feed itself.
+    pub feed: Feed,
+    /// Unread entry count.
+    pub unread: i64,
+    /// Tag names attached to the feed.
+    pub tags: Vec<String>,
+    /// Entries, newest first.
+    pub entries: Vec<Entry>,
+    /// Publication date of the newest entry, shown in the tree.
+    pub newest_date: Option<DateTime<Utc>>,
+}
+
 /// A discovered feed candidate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiscoveredFeed {

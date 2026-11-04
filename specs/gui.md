@@ -308,10 +308,12 @@ opposed to `Store::get_feeds` which includes unfetched feeds. A feed is visible
 when its `title` or `user_title` is non-empty, or when it has at least one
 entry.
 
-`FeedNode` carries `feed`, `unread`, `tags`, `entries` and `newest_date` — the
-publication date of the feed's newest entry, or `null` when no entry carries a
-date. The feed row renders `newest_date`; the feed's own `last_updated` (the
-last successful fetch) is not shown.
+`FeedNode` is defined in `feeds-core` and assembled by
+`Store::get_feed_nodes`, which `get_tree` returns unchanged. Each node carries
+`feed`, `unread`, `tags`, `entries` and `newest_date` — the publication date of
+the feed's newest entry, or `null` when no entry carries a date. The feed row
+renders `newest_date`; the feed's own `last_updated` (the last successful fetch)
+is not shown.
 
 ### Keyboard shortcuts
 
