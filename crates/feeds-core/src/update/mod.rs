@@ -147,7 +147,8 @@ fn noop_outcome(url: &str, title: Option<String>, store: &Store) -> UpdateOutcom
         url: url.to_string(),
         title,
         new_entries: 0,
-        total_entries: store.entry_count(url).unwrap_or(0).max(0) as usize,
+        total_entries: usize::try_from(store.entry_count(url).unwrap_or(0).max(0))
+            .unwrap_or_default(),
     }
 }
 
@@ -212,9 +213,7 @@ pub async fn update_feeds(store: &Store, client: &Client, scheduled: bool) -> Re
 }
 
 fn default_workers(feed_count: usize) -> usize {
-    let cpus = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
+    let cpus = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
     feed_count.min(cpus * 2).max(1)
 }
 

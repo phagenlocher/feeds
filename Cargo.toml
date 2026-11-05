@@ -10,6 +10,37 @@ license = "GPL-3.0-only"
 repository = "https://github.com/phagenlocher/feeds"
 authors = ["phagenlocher"]
 
+# Lint policy for every workspace member (each crate opts in with
+# `[lints] workspace = true`). `just lint` and CI escalate these to errors.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+let_underscore_drop = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+trivial_casts = { level = "warn", priority = -1 }
+trivial_numeric_casts = { level = "warn", priority = -1 }
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Not actionable here: internal APIs need no `# Errors` docs, Tauri command
+# arguments are deserialized by value, and `#[must_use]` on every helper is noise.
+missing_errors_doc = "allow"
+needless_pass_by_value = "allow"
+must_use_candidate = "allow"
+# Cheap and meaningful for this codebase.
+unwrap_used = "warn"
+expect_used = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+# Deliberately not enabled: `significant_drop_tightening` (nursery) suggests
+# dropping the store's `MutexGuard` before the `rusqlite::Statement` that
+# borrows it, which does not compile.
+
 [workspace.dependencies]
 feed-rs = "3.0"
 rusqlite = { version = "0.40", features = ["bundled"] }

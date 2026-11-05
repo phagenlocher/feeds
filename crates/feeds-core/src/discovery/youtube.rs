@@ -2,7 +2,8 @@
 //!
 //! YouTube blocks automated page access with a consent wall, so we never
 //! fetch YouTube HTML. Instead we derive the feed URL from the URL pattern
-//! or via the oEmbed / resolve_url APIs, both of which work without consent.
+//! or via the `oEmbed` / `resolve_url` APIs, both of which work without
+//! consent.
 
 use std::time::Duration;
 
@@ -101,7 +102,7 @@ async fn user_feed(client: &Client, user: &str) -> Vec<DiscoveredFeed> {
     .await
 }
 
-/// Resolve a channel URL to a `UC...` channel ID via the resolve_url API.
+/// Resolve a channel URL to a `UC...` channel ID via the `resolve_url` API.
 async fn resolve_channel_id(client: &Client, channel_url: &str) -> Option<String> {
     let body = json!({
         "context": { "client": { "clientName": "WEB", "clientVersion": YOUTUBE_CLIENT_VERSION } },

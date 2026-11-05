@@ -25,6 +25,15 @@ struct Args {
 }
 
 /// Build and run the Tauri application.
+///
+/// # Panics
+///
+/// Panics if the Tauri event loop terminates with an error, which leaves the
+/// process with no running UI.
+#[expect(
+    clippy::expect_used,
+    reason = "the event loop cannot continue once Tauri fails"
+)]
 pub fn run() {
     let args = Args::parse();
     let level = if args.verbose {
@@ -32,24 +41,26 @@ pub fn run() {
     } else {
         tracing::Level::INFO
     };
-    let _ = tracing_subscriber::fmt()
-        .with_max_level(level)
-        .with_target(false)
-        .try_init();
+    drop(
+        tracing_subscriber::fmt()
+            .with_max_level(level)
+            .with_target(false)
+            .try_init(),
+    );
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
+                drop(window.unminimize());
+                drop(window.show());
+                drop(window.set_focus());
             }
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .on_menu_event(|app, event| {
-            let _ = app.emit("menu", event.id().as_ref().to_string());
+            drop(app.emit("menu", event.id().as_ref().to_string()));
         })
         .setup(move |app| {
             let feeds = Feeds::open(args.data_dir.clone()).map_err(|e| {

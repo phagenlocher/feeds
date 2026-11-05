@@ -10,18 +10,30 @@ pub type TagColors = BTreeMap<String, String>;
 /// Return a stable default color (`#rrggbb`) for `tag`.
 pub fn default_color_for_tag(tag: &str) -> String {
     let digest = md5::compute(tag.as_bytes()).0;
-    let h = (digest[0] ^ digest[3] ^ digest[6] ^ digest[9] ^ digest[12]) as f64 / 255.0;
-    let sf = (digest[1] ^ digest[4] ^ digest[7] ^ digest[10] ^ digest[13]) as f64 / 255.0;
-    let lf = (digest[2] ^ digest[5] ^ digest[8] ^ digest[11] ^ digest[14]) as f64 / 255.0;
-    let s = 0.2 * sf + 0.6;
-    let l = 0.2 * lf + 0.55;
-    let (r, g, b) = hls_to_rgb(h, l, s);
+    let hue = f64::from(digest[0] ^ digest[3] ^ digest[6] ^ digest[9] ^ digest[12]) / 255.0;
+    let saturation_seed =
+        f64::from(digest[1] ^ digest[4] ^ digest[7] ^ digest[10] ^ digest[13]) / 255.0;
+    let lightness_seed =
+        f64::from(digest[2] ^ digest[5] ^ digest[8] ^ digest[11] ^ digest[14]) / 255.0;
+    let saturation = 0.2 * saturation_seed + 0.6;
+    let lightness = 0.2 * lightness_seed + 0.55;
+    let (red, green, blue) = hls_to_rgb(hue, lightness, saturation);
     format!(
         "#{:02x}{:02x}{:02x}",
-        (r * 255.0).round() as u8,
-        (g * 255.0).round() as u8,
-        (b * 255.0).round() as u8
+        channel_byte(red),
+        channel_byte(green),
+        channel_byte(blue)
     )
+}
+
+/// Convert a color channel in `0.0..=1.0` to its byte value.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the value is clamped to 0.0..=255.0 before the cast"
+)]
+fn channel_byte(value: f64) -> u8 {
+    (value * 255.0).round().clamp(0.0, 255.0) as u8
 }
 
 fn hls_to_rgb(h: f64, l: f64, s: f64) -> (f64, f64, f64) {

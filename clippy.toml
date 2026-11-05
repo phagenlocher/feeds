@@ -1,0 +1,25 @@
+# Clippy configuration for the workspace.
+
+# Tests legitimately use unwrap/expect/panic; production code does not.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+
+# Documentation routinely mentions these names and formats.
+doc-valid-idents = [
+    "OPML",
+    "SQLite",
+    "Tauri",
+    "YouTube",
+    "RFC",
+    "URL",
+    "HTTP",
+    "HTTPS",
+    "UTF",
+    "RSS",
+    "Atom",
+    "JSON",
+    "API",
+    "GUI",
+    "UTC",
+]

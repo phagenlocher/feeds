@@ -14,6 +14,9 @@ default-run = "feeds-app"
 name = "feeds_app"
 crate-type = ["rlib"]
 
+[lints]
+workspace = true
+
 [features]
 # Production marker: makes Tauri serve the embedded frontend assets instead of
 # pointing the webview at a dev server. Do not remove.

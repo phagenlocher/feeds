@@ -47,6 +47,13 @@ The frontend recipes (`just ui-install` / `just ui-build`) always use
 - Frontend: Svelte 4 + TypeScript; theme colors derive from the system palette
   via CSS variables (`Canvas`, `CanvasText`, `Highlight`, `HighlightText`) and
   `color-mix`. The modal backdrop and menu shadow use translucent black.
+- Lint policy lives in `[workspace.lints]` and `clippy.toml`; each crate opts
+  in with `[lints] workspace = true`. Pedantic Clippy is enabled, so new code
+  must be warning-free. Production code must not `unwrap`, `expect` or print;
+  where a panic is genuinely intended, mark it with
+  `#[expect(clippy::expect_used, reason = "...")]` and document it in a
+  `# Panics` section. Use `drop(value)` for deliberately ignored `Result`s
+  instead of `let _ = ...`. Tests may unwrap and expect freely.
 
 ## Layout
 - `crates/feeds-core/src/parse` — `feed-rs` adapter

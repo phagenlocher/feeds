@@ -1,5 +1,8 @@
 //! Integration tests for the persisted application settings.
 
+// Setup helpers panic on failure; the tests themselves rely on that.
+#![allow(clippy::unwrap_used)]
+
 use feeds_core::settings::{DEFAULT_FONT_SIZE, MIN_FONT_SIZE, SETTING_FONT_SIZE};
 use feeds_core::Feeds;
 
@@ -148,5 +151,5 @@ fn deleting_a_tag_drops_its_color() {
 
     let settings = feeds.get_settings().unwrap();
     assert!(!settings.tag_colors.contains_key("news"));
-    assert!(feeds.get_all_tag_keys().unwrap().is_empty());
+    assert_eq!(feeds.get_all_tag_keys().unwrap(), Vec::<String>::new());
 }

@@ -67,6 +67,10 @@ fn parse_feed(bytes: &[u8]) -> parser::ParseFeedResult<feed_rs::model::Feed> {
 /// Timestamps that are already complete are left untouched.
 fn normalize_rfc2822_timestamps(bytes: &[u8]) -> Option<String> {
     static RE: OnceLock<Regex> = OnceLock::new();
+    #[expect(
+        clippy::expect_used,
+        reason = "the pattern is a literal that is known to compile"
+    )]
     let re = RE.get_or_init(|| {
         Regex::new(
             r"(?is)<(pubDate|lastBuildDate|published|updated|dc:date)\s*>\s*([A-Za-z]{3,9},?\s+)?(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})(\s+\d{1,2}:\d{2}(?::\d{2})?)?\s*</(pubDate|lastBuildDate|published|updated|dc:date)>",
@@ -74,16 +78,16 @@ fn normalize_rfc2822_timestamps(bytes: &[u8]) -> Option<String> {
         .expect("static pattern is valid")
     });
     let text = std::str::from_utf8(bytes).ok()?;
-    let normalized = re.replace_all(text, |caps: &regex::Captures| {
+    let normalized = re.replace_all(text, |caps: &regex::Captures<'_>| {
         let tag = &caps[1];
         // Leave a mismatched pair of tags alone rather than corrupting it.
         if tag != &caps[5] {
             return caps[0].to_string();
         }
-        let weekday = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+        let weekday = caps.get(2).map_or("", |m| m.as_str());
         let date = &caps[3];
         // The captured time keeps its leading whitespace; the default adds it.
-        let time = caps.get(4).map(|m| m.as_str()).unwrap_or(" 00:00:00");
+        let time = caps.get(4).map_or(" 00:00:00", |m| m.as_str());
         format!("<{tag}>{weekday}{date}{time} +0000</{tag}>")
     });
     (normalized != text).then(|| normalized.into_owned())
@@ -98,6 +102,10 @@ fn normalize_rfc2822_timestamps(bytes: &[u8]) -> Option<String> {
 /// crate's model, drop those empty elements and let the caller retry.
 fn repair_empty_media_text(bytes: &[u8]) -> Option<String> {
     static RE: OnceLock<Regex> = OnceLock::new();
+    #[expect(
+        clippy::expect_used,
+        reason = "the pattern is a literal that is known to compile"
+    )]
     let re = RE.get_or_init(|| {
         Regex::new(
             r"(?is)<media:(?:title|description)(?:\s[^>]*?)?\s*(?:/>|>\s*</media:(?:title|description)\s*>)",

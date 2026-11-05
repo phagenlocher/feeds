@@ -1,5 +1,12 @@
 //! Fuzzy title matching for the UI's "filter entries" feature.
 
+// String lengths are far below 2^53, so converting them to `f64` is exact in
+// practice and the similarity ratios the API promises are unaffected.
+#![expect(
+    clippy::cast_precision_loss,
+    reason = "lengths are far below 2^53, so the cast is lossless here"
+)]
+
 /// Default match threshold.
 pub const PARTIAL_RATIO_THRESHOLD: f64 = 80.0;
 

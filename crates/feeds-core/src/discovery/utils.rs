@@ -29,9 +29,8 @@ pub async fn validate_feed(client: &Client, feed_url: &str) -> Vec<DiscoveredFee
         }
     };
     let final_url = resp.url().to_string();
-    let bytes = match resp.bytes().await {
-        Ok(bytes) => bytes,
-        Err(_) => return Vec::new(),
+    let Ok(bytes) = resp.bytes().await else {
+        return Vec::new();
     };
     match parse::feed_title(&bytes) {
         Some(title) => vec![DiscoveredFeed {

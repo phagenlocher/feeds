@@ -43,8 +43,7 @@ pub fn parse_link_header(value: &str, base_url: &str) -> Vec<DiscoveredFeed> {
             let resolved = base
                 .as_ref()
                 .and_then(|b| b.join(href).ok())
-                .map(|u| u.to_string())
-                .unwrap_or_else(|| href.to_string());
+                .map_or_else(|| href.to_string(), |u| u.to_string());
             let title = if title.is_empty() {
                 resolved.clone()
             } else {
@@ -142,7 +141,7 @@ mod tests {
     #[test]
     fn ignores_non_feed_types() {
         let header = r#"</style.css>; rel="stylesheet"; type="text/css""#;
-        assert!(parse_link_header(header, "https://example.com/").is_empty());
+        assert_eq!(parse_link_header(header, "https://example.com/"), []);
     }
 
     #[test]

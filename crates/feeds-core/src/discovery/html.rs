@@ -10,6 +10,15 @@ use crate::models::DiscoveredFeed;
 ///
 /// Honours `<base href>` for relative URL resolution. Returns one
 /// [`DiscoveredFeed`] per match, in document order.
+///
+/// # Panics
+///
+/// Panics only if the built-in `base`/`link` selector patterns stop being
+/// valid, which the literals rule out.
+#[expect(
+    clippy::expect_used,
+    reason = "the selector patterns are literals known to be valid"
+)]
 pub fn extract_feed_links(html: &str, page_url: &str) -> Vec<DiscoveredFeed> {
     let document = Html::parse_document(html);
 
@@ -46,12 +55,10 @@ pub fn extract_feed_links(html: &str, page_url: &str) -> Vec<DiscoveredFeed> {
         let resolved = base_url
             .as_ref()
             .and_then(|b| b.join(href).ok())
-            .map(|u| u.to_string())
-            .unwrap_or_else(|| href.to_string());
+            .map_or_else(|| href.to_string(), |u| u.to_string());
         let title = value
             .attr("title")
-            .map(str::to_string)
-            .unwrap_or_else(|| resolved.clone());
+            .map_or_else(|| resolved.clone(), str::to_string);
         feeds.push(DiscoveredFeed {
             url: resolved,
             title,
@@ -104,6 +111,6 @@ mod tests {
     #[test]
     fn ignores_missing_alternate() {
         let html = r#"<link rel="stylesheet" type="application/rss+xml" href="/f">"#;
-        assert!(extract_feed_links(html, "https://example.com/").is_empty());
+        assert_eq!(extract_feed_links(html, "https://example.com/"), []);
     }
 }

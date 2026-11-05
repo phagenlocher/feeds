@@ -13,6 +13,9 @@ publish = false
 name = "feeds_core"
 path = "src/lib.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 feed-rs.workspace = true
 rusqlite.workspace = true

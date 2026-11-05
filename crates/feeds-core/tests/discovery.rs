@@ -114,12 +114,11 @@ async fn subreddit_url_maps_to_rss() {
     // Point the handler at the mock by using a reddit.com-like host that we
     // cannot rewrite; instead verify the *pattern* through the generic path.
     // The dedicated handler is unit-tested via the URL builder below.
-    let _ = server;
+    drop(server);
 
-    let built = feeds_core::discovery::reddit::reddit_feed_url("https://www.reddit.com/r/rust");
+    let built = discovery::reddit::reddit_feed_url("https://www.reddit.com/r/rust");
     assert_eq!(built.as_deref(), Some("https://www.reddit.com/r/rust/.rss"));
-    let built_user =
-        feeds_core::discovery::reddit::reddit_feed_url("https://reddit.com/user/alice/posts");
+    let built_user = discovery::reddit::reddit_feed_url("https://reddit.com/user/alice/posts");
     assert_eq!(
         built_user.as_deref(),
         Some("https://www.reddit.com/user/alice/.rss")

@@ -51,6 +51,7 @@ impl Settings {
     ///
     /// A font size below [`MIN_FONT_SIZE`] is not usable and falls back to
     /// [`DEFAULT_FONT_SIZE`].
+    #[must_use]
     pub fn normalized(&self) -> Self {
         let mut settings = self.clone();
         if settings.font_size < MIN_FONT_SIZE {

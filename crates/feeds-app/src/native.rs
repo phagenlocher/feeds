@@ -45,7 +45,7 @@ mod linux {
                 }
                 provider
             });
-            let _ = provider.load_from_data(css.as_bytes());
+            drop(provider.load_from_data(css.as_bytes()));
         });
     }
 }

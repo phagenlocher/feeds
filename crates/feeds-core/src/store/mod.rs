@@ -17,7 +17,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Default scheduled-update interval, in minutes.
 pub const DEFAULT_UPDATE_INTERVAL_MINUTES: i64 = 60;
 
-const DDL: &str = r#"
+const DDL: &str = r"
 CREATE TABLE IF NOT EXISTS feeds (
     url             TEXT PRIMARY KEY NOT NULL,
     title           TEXT,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS tag_colors (
     tag   TEXT PRIMARY KEY NOT NULL,
     color TEXT NOT NULL
 );
-"#;
+";
 
 /// Filter for [`Store::get_feeds`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,7 +85,7 @@ pub enum TagFilter {
 pub struct FeedUpdateState {
     /// Feed URL.
     pub url: String,
-    /// Stored caching info (ETag / Last-Modified) as raw JSON.
+    /// Stored caching info (`ETag` / `Last-Modified`) as raw JSON.
     pub caching_info: Option<String>,
     /// Whether updates are enabled.
     pub updates_enabled: bool,
@@ -96,6 +96,7 @@ pub struct FeedUpdateState {
 }
 
 /// A handle to the feeds database.
+#[derive(Debug)]
 pub struct Store {
     conn: Mutex<Connection>,
 }
@@ -128,7 +129,9 @@ impl Store {
     }
 
     fn lock(&self) -> MutexGuard<'_, Connection> {
-        self.conn.lock().unwrap_or_else(|e| e.into_inner())
+        self.conn
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     // ── Feeds ──────────────────────────────────────────────────────────
@@ -242,7 +245,7 @@ impl Store {
                 join = " JOIN feed_tags t ON t.feed = f.url";
                 let placeholders = vec!["?"; tags.len()].join(",");
                 conditions.push(format!("t.key IN ({placeholders})"));
-                bound = tags.clone();
+                bound.clone_from(tags);
             }
         }
         if visible_only {
@@ -266,9 +269,7 @@ impl Store {
         );
 
         let mut stmt = conn.prepare(&sql)?;
-        let params_ref: Vec<&dyn rusqlite::ToSql> =
-            bound.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
-        let rows = stmt.query_map(params_ref.as_slice(), row_to_feed)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(bound.iter()), row_to_feed)?;
         let feeds = rows.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(feeds)
     }
@@ -335,7 +336,7 @@ impl Store {
         let now = datetime::format(&datetime::now());
         self.lock().execute(
             "UPDATE entries SET read = ?3, read_modified = ?4 WHERE feed = ?1 AND id = ?2",
-            params![feed, entry_id, read as i64, now],
+            params![feed, entry_id, i64::from(read), now],
         )?;
         Ok(())
     }
@@ -581,7 +582,7 @@ impl Store {
         Ok(UpdateOutcome {
             url: url.to_string(),
             title: parsed.title.clone(),
-            new_entries: (after - before).max(0) as usize,
+            new_entries: usize::try_from((after - before).max(0)).unwrap_or_default(),
             total_entries: parsed.entries.len(),
         })
     }

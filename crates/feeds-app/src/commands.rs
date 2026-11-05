@@ -175,7 +175,7 @@ pub fn set_font_size(
     size: i32,
 ) -> Result<i32, String> {
     let size = state.feeds.set_font_size(size).map_err(err)?;
-    let _ = app.run_on_main_thread(move || crate::native::apply_font_size(size));
+    drop(app.run_on_main_thread(move || crate::native::apply_font_size(size)));
     Ok(size)
 }
 

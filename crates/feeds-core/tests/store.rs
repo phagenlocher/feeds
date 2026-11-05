@@ -1,7 +1,10 @@
 //! Integration tests for the storage layer.
 
+// Setup helpers panic on failure; the tests themselves rely on that.
+#![allow(clippy::unwrap_used)]
+
 use feeds_core::store::TagFilter;
-use feeds_core::{Feeds, Store};
+use feeds_core::{FeedNode, Feeds, Store};
 
 fn store() -> Store {
     Store::open_in_memory().unwrap()
@@ -107,7 +110,10 @@ fn feed_nodes_bundle_entries_tags_and_unread_state() {
 fn feed_nodes_exclude_hidden_feeds() {
     let store = store();
     store.add_feed("https://down.example/feed", true).unwrap();
-    assert!(store.get_feed_nodes(TagFilter::All).unwrap().is_empty());
+    assert_eq!(
+        store.get_feed_nodes(TagFilter::All).unwrap(),
+        Vec::<FeedNode>::new()
+    );
 }
 
 #[test]
@@ -409,7 +415,7 @@ fn undated_entries_keep_their_import_time_as_sort_key() {
         version: "rss20".into(),
         entries,
     };
-    let ids = |store: &feeds_core::Store| -> Vec<String> {
+    let ids = |store: &Store| -> Vec<String> {
         store
             .get_entries(url)
             .unwrap()
@@ -471,7 +477,7 @@ fn tags_filter_and_rename() {
     );
 
     store.delete_tag_globally("tech").unwrap();
-    assert!(store.tag_keys().unwrap().is_empty());
+    assert_eq!(store.tag_keys().unwrap(), Vec::<String>::new());
 }
 
 #[test]

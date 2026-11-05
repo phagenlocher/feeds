@@ -16,15 +16,17 @@ use crate::{opml, tags, update, USER_AGENT};
 
 /// The default data directory (`~/.feeds`).
 pub fn default_data_dir() -> PathBuf {
-    directories::BaseDirs::new()
-        .map(|dirs| dirs.home_dir().join(".feeds"))
-        .unwrap_or_else(|| PathBuf::from(".feeds"))
+    directories::BaseDirs::new().map_or_else(
+        || PathBuf::from(".feeds"),
+        |dirs| dirs.home_dir().join(".feeds"),
+    )
 }
 
 /// Name of the Rust database file.
 pub const DB_FILENAME: &str = "feeds.db";
 
 /// Application facade over the feeds database and network client.
+#[derive(Debug)]
 pub struct Feeds {
     store: Store,
     client: Client,
@@ -375,7 +377,7 @@ mod tests {
         assert!(feeds.store().get_tag_color("news").unwrap().is_some());
 
         feeds.delete_tag("news").unwrap();
-        assert!(feeds.get_all_tag_keys().unwrap().is_empty());
+        assert_eq!(feeds.get_all_tag_keys().unwrap(), Vec::<String>::new());
         assert!(feeds.store().get_tag_color("news").unwrap().is_none());
     }
 
