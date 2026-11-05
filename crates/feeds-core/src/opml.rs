@@ -18,15 +18,23 @@ pub fn export_feeds(feeds: &[Feed]) -> Result<String> {
     opml.to_string().map_err(|e| Error::Opml(e.to_string()))
 }
 
-/// Parse an OPML document into `(url, title)` pairs.
-pub fn import_feeds(xml: &str) -> Result<Vec<(String, Option<String>)>> {
-    let opml = OPML::from_str(xml).map_err(|e| Error::Opml(e.to_string()))?;
-    let mut out = Vec::new();
-    collect_outlines(&opml.body.outlines, &mut out);
-    Ok(out)
+/// A feed parsed from an OPML outline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportedFeed {
+    /// Subscription URL from the outline's `xmlUrl`.
+    pub url: String,
+    /// Outline title/text, or `None` when blank.
+    pub title: Option<String>,
 }
 
-fn collect_outlines(outlines: &[opml::Outline], out: &mut Vec<(String, Option<String>)>) {
+/// Parse an OPML document into imported feeds.
+pub fn import_feeds(xml: &str) -> Result<Vec<ImportedFeed>> {
+    let opml = OPML::from_str(xml).map_err(|e| Error::Opml(e.to_string()))?;
+    Ok(collect_outlines(&opml.body.outlines))
+}
+
+fn collect_outlines(outlines: &[opml::Outline]) -> Vec<ImportedFeed> {
+    let mut out = Vec::new();
     for outline in outlines {
         if let Some(url) = &outline.xml_url {
             let title = outline
@@ -34,10 +42,14 @@ fn collect_outlines(outlines: &[opml::Outline], out: &mut Vec<(String, Option<St
                 .clone()
                 .or_else(|| Some(outline.text.clone()))
                 .filter(|t| !t.trim().is_empty());
-            out.push((url.clone(), title));
+            out.push(ImportedFeed {
+                url: url.clone(),
+                title,
+            });
         }
-        collect_outlines(&outline.outlines, out);
+        out.extend(collect_outlines(&outline.outlines));
     }
+    out
 }
 
 #[cfg(test)]
@@ -63,8 +75,8 @@ mod tests {
         let xml = export_feeds(&feeds).unwrap();
         let imported = import_feeds(&xml).unwrap();
         assert_eq!(imported.len(), 2);
-        assert_eq!(imported[0].0, "https://example.com/feed");
-        assert_eq!(imported[0].1.as_deref(), Some("Example"));
+        assert_eq!(imported[0].url, "https://example.com/feed");
+        assert_eq!(imported[0].title.as_deref(), Some("Example"));
     }
 
     #[test]
@@ -77,10 +89,10 @@ mod tests {
         let imported = import_feeds(xml).unwrap();
         assert_eq!(
             imported,
-            vec![(
-                "https://rust-lang.org/feed.xml".to_string(),
-                Some("Rust".to_string())
-            )]
+            vec![ImportedFeed {
+                url: "https://rust-lang.org/feed.xml".to_string(),
+                title: Some("Rust".to_string()),
+            }]
         );
     }
 }

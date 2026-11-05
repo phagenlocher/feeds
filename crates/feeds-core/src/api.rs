@@ -281,8 +281,8 @@ impl Feeds {
     pub fn import_opml(&self, xml: &str) -> Result<usize> {
         let feeds = opml::import_feeds(xml)?;
         let mut count = 0;
-        for (url, _title) in feeds {
-            self.add_feed(&url)?;
+        for feed in feeds {
+            self.add_feed(&feed.url)?;
             count += 1;
         }
         Ok(count)

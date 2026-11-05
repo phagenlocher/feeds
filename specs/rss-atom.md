@@ -279,7 +279,7 @@ format that is not read by the application.
 **Scenario: feeds are imported**
 **Given** an OPML file, including nested outlines
 **When** it is imported
-**Then** `(url, title)` pairs are read for every outline
+**Then** an `ImportedFeed` with its URL and optional title is read for every outline
 **And** the feeds are subscribed
 
 ## Reference
@@ -316,6 +316,17 @@ Both derive `Serialize`/`Deserialize` (they cross the Tauri IPC boundary).
 `feeds_core::models::newest_entry_date(&[Entry]) -> Option<DateTime<Utc>>`
 returns the date of the newest entry of a newest-first list, skipping entries
 without a date.
+
+#### `ImportedFeed` (`feeds_core::opml::ImportedFeed`)
+
+```rust
+pub struct ImportedFeed {
+    pub url: String,                  // subscription URL from xmlUrl
+    pub title: Option<String>,        // outline title/text, None when blank
+}
+```
+
+Returned by `feeds_core::opml::import_feeds`.
 
 ### Storage
 
