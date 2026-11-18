@@ -1,9 +1,8 @@
 //! Fuzzy title matching for the UI's "filter entries" feature.
 //!
-//! This mirrors the former Python implementation, which used `RapidFuzz`'s
-//! `fuzz.partial_ratio`: normalized Indel similarity (derived from the longest
-//! common subsequence) over the best alignment of the shorter string in the
-//! longer one.
+//! Uses normalized Indel similarity (derived from the longest common
+//! subsequence) over the best alignment of the shorter string in the longer
+//! one.
 
 // String lengths are far below 2^53, so converting them to `f64` is exact in
 // practice and the similarity ratios the API promises are unaffected.
@@ -71,8 +70,8 @@ pub fn find_matches(query: &str, title: &str) -> Vec<MatchSpan> {
 fn match_span(needle: &[char], haystack: &[char], origin: &[usize]) -> Option<MatchSpan> {
     let (score, span) = if haystack.len() >= needle.len() {
         let (mut score, span) = best_alignment(needle, haystack);
-        // RapidFuzz also tries the opposite direction for equal-length strings,
-        // which lets a prefix or suffix of either string win.
+        // The opposite direction is also tried for equal-length strings, which
+        // lets a prefix or suffix of either string win.
         if score < 100.0 && needle.len() == haystack.len() {
             score = score.max(best_alignment(haystack, needle).0);
         }
@@ -270,7 +269,6 @@ mod tests {
 
     #[test]
     fn typo_tolerance_stops_short_of_unrelated_titles() {
-        // These matched under the previous Levenshtein implementation.
         assert!(!matches("latex", "Paintings"));
         assert!(!matches(
             "latex",
@@ -283,7 +281,7 @@ mod tests {
     fn matching_respects_threshold() {
         assert!(matches("rust", "Rust programming"));
         assert!(!matches("zzzzzz", "Rust programming"));
-        // 88.89 is above the threshold; 80 is below it.
+        // 88.89 is above the threshold.
         assert!(matches("latex", "Software Projects Will Be Late"));
         assert!(!matches("latex", "Dhall is now a template engine"));
     }

@@ -303,8 +303,8 @@ async runtime.
 
 ### Fuzzy matching
 
-`crates/feeds-core/src/fuzzy.rs` implements the search with RapidFuzz's
-`fuzz.partial_ratio` semantics, as the former Python app did:
+`crates/feeds-core/src/fuzzy.rs` implements the search with normalized Indel
+(LCS) partial-ratio matching:
 
 - Both strings are lowercased.
 - `ratio` is the normalized Indel similarity, derived from the longest common
@@ -312,9 +312,8 @@ async runtime.
 - `partial_ratio` returns the best `ratio` between the shorter string and any
   same-length window of the longer one, plus all prefix and suffix alignments.
   For equal-length strings it also considers prefixes and suffixes of the first
-  string, matching RapidFuzz's implementation.
-- A token matches when its `partial_ratio` with the title is at least 85
-  (stricter than the former app's 80).
+  string.
+- A token matches when its `partial_ratio` with the title is at least 85.
 - The query is split on whitespace and every token must match the title
   independently, so `defeat return` matches “Defeating Return Type
   Polymorphism”. Each token's best alignment is highlighted.

@@ -29,8 +29,7 @@ The frontend recipes (`just ui-install` / `just ui-build`) always use
   values into SQL. Dynamic `WHERE` and placeholder fragments are assembled only
   from fixed strings, as in `Store::query_feeds`.
 - All persistent state lives in the SQLite database, settings included
-  (`app_settings` for scalars, `tag_colors` for tag colors). `settings.json` is
-  a legacy format the application does not read.
+  (`app_settings` for scalars, `tag_colors` for tag colors).
 - The schema is created with `CREATE TABLE IF NOT EXISTS`, so new tables are
   added to an existing database on open. `Store::SCHEMA_VERSION` is written to
   the `user_version` pragma, but it gates no migration.
@@ -44,7 +43,7 @@ The frontend recipes (`just ui-install` / `just ui-build`) always use
   `YYYY-MM-DD` in the user's local time zone. A feed row shows the date of its
   newest entry, never the feed's last-updated timestamp.
 - Fuzzy title matching uses normalized Indel (LCS) partial-ratio matching
-  (threshold 85), based on the former Python app's RapidFuzz behaviour.
+  (threshold 85).
 - Search forces feeds with matches to render expanded (without mutating
   `expanded`) and highlights the spans returned by `fuzzy_filter`. Every
   whitespace-separated query token must match the title.

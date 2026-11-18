@@ -264,8 +264,7 @@ Tag **colors** are stored in the `tag_colors` table of the database.
 **When** `Feeds::set_tag_color` is called
 **Then** the color is written to the `tag_colors` table
 
-All persistent state lives in the SQLite database. `settings.json` is a legacy
-format that is not read by the application.
+All persistent state lives in the SQLite database.
 
 ### OPML
 

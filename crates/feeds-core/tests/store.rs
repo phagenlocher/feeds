@@ -585,7 +585,7 @@ fn opening_an_existing_database_adds_the_settings_tables() {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("feeds.db");
 
-    // An older database: the feeds/entries/tags tables, but no settings.
+    // A database with the feeds/entries/tags tables, but no settings.
     {
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         conn.execute_batch(
