@@ -14,6 +14,7 @@
   import type {
     Entry,
     FeedNode,
+    MatchSpan,
     Settings,
     UpdateFailure,
     UpdateReport,
@@ -32,6 +33,8 @@
   let expanded = new Set<string>();
   let selected: { feed: string; entry: string | null } | null = null;
   let hidden = new Set<string>();
+  let matchSpans = new Map<string, MatchSpan[]>();
+  let filterSeq = 0;
   let previewColors: Record<string, string> = {};
 
   let contextMenu:
@@ -58,22 +61,72 @@
   let colorValue = "#888888";
   let colorHex = "#888888";
 
-  let filterTimer: ReturnType<typeof setTimeout> | undefined;
-
   const entryKey = (feed: string, entry: string) => feed + "\u0000" + entry;
 
+  interface TitlePart {
+    text: string;
+    match: boolean;
+  }
+
+  type VisibleEntry = Entry & { highlight?: TitlePart[] | null };
+  type VisibleNode = Omit<FeedNode, "entries"> & { entries: VisibleEntry[] };
+
+  // Splits a title around its matched spans. Spans are Unicode scalar offsets,
+  // so split by code points rather than UTF-16 indices.
+  function highlightParts(
+    title: string,
+    spans: MatchSpan[] | undefined,
+  ): TitlePart[] | null {
+    if (!spans || spans.length === 0) return null;
+    const chars = Array.from(title);
+    const parts: TitlePart[] = [];
+    let cursor = 0;
+    for (const span of spans) {
+      if (
+        span.start < cursor ||
+        span.end > chars.length ||
+        span.start >= span.end
+      ) {
+        continue;
+      }
+      if (span.start > cursor) {
+        parts.push({
+          text: chars.slice(cursor, span.start).join(""),
+          match: false,
+        });
+      }
+      parts.push({
+        text: chars.slice(span.start, span.end).join(""),
+        match: true,
+      });
+      cursor = span.end;
+    }
+    if (cursor < chars.length) {
+      parts.push({ text: chars.slice(cursor).join(""), match: false });
+    }
+    return parts.length > 0 ? parts : null;
+  }
+
   // Reactive view of the tree. Computed here (rather than in the template via
-  // helper functions) so Svelte re-runs it whenever the query or `hidden`
-  // changes: the compiler cannot see through a function call in the template.
-  // With a query active, only matching entries are kept and feeds left with no
-  // matching entry disappear.
+  // helper functions) so Svelte re-runs it whenever the query, `hidden` or
+  // `matchSpans` changes: the compiler cannot see through a function call in
+  // the template. With a query active, only matching entries are kept, feeds
+  // left with no matching entry disappear, and matching titles carry their
+  // highlight span.
+  let visibleNodes: VisibleNode[] = [];
   $: visibleNodes = filterText
     ? nodes
         .map((node) => ({
           ...node,
-          entries: node.entries.filter(
-            (e) => !hidden.has(entryKey(e.feed_id, e.entry_id)),
-          ),
+          entries: node.entries
+            .filter((e) => !hidden.has(entryKey(e.feed_id, e.entry_id)))
+            .map((e) => ({
+              ...e,
+              highlight: highlightParts(
+                e.title,
+                matchSpans.get(entryKey(e.feed_id, e.entry_id)),
+              ),
+            })),
         }))
         .filter((node) => node.entries.length > 0)
     : nodes;
@@ -139,32 +192,47 @@
   }
 
   async function applyFilter() {
+    const seq = ++filterSeq;
     if (!filterText) {
       hidden = new Set();
+      matchSpans = new Map();
       return;
     }
+    const query = filterText;
     const entries = nodes.flatMap((n) => n.entries);
     try {
-      const res = await invoke<boolean[]>("fuzzy_filter", {
-        query: filterText,
+      const res = await invoke<MatchSpan[][]>("fuzzy_filter", {
+        query,
         texts: entries.map((e) => e.title),
       });
+      // Ignore a response for a query that has since been replaced.
+      if (seq !== filterSeq || query !== filterText) return;
       const h = new Set<string>();
+      const spans = new Map<string, MatchSpan[]>();
       entries.forEach((e, i) => {
-        if (!res[i]) h.add(entryKey(e.feed_id, e.entry_id));
+        const key = entryKey(e.feed_id, e.entry_id);
+        const found = res[i];
+        if (found.length > 0) spans.set(key, found);
+        else h.add(key);
       });
       hidden = h;
+      matchSpans = spans;
     } catch {
+      if (seq !== filterSeq || query !== filterText) return;
       hidden = new Set();
+      matchSpans = new Map();
     }
   }
 
-  function onFilterInput() {
-    clearTimeout(filterTimer);
-    filterTimer = setTimeout(() => applyFilter(), 150);
+  function onFilterInput(event: Event) {
+    filterText = (event.currentTarget as HTMLInputElement).value;
+    void applyFilter();
   }
 
   function toggleFeed(url: string) {
+    // Feeds are force-expanded while a search is active; leave the user's
+    // saved expansion state untouched.
+    if (filterText) return;
     const s = new Set(expanded);
     if (s.has(url)) s.delete(url);
     else s.add(url);
@@ -714,7 +782,7 @@
       >
         <span
           class="disclosure"
-          class:open={expanded.has(node.feed.id)}
+          class:open={filterText || expanded.has(node.feed.id)}
           on:click|stopPropagation={() => toggleFeed(node.feed.id)}
         >
           <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 2 L7 5 L3 8 Z" /></svg>
@@ -729,7 +797,7 @@
         <span class="feed-date">{fmtDate(node.newest_date)}</span>
       </div>
 
-      {#if expanded.has(node.feed.id)}
+      {#if filterText || expanded.has(node.feed.id)}
         {#each node.entries as entry (entry.entry_id)}
           <div
             class="entry-row"
@@ -738,7 +806,9 @@
             on:dblclick={() => openEntry(node, entry)}
             on:contextmenu|preventDefault={(e) => openContext(e, "entry", node, entry)}
           >
-            <span class="entry-title" class:bold={!entry.read}>{entry.title}</span>
+            <span class="entry-title" class:bold={!entry.read}
+              >{#if entry.highlight}{#each entry.highlight as part}{#if part.match}<mark>{part.text}</mark>{:else}{part.text}{/if}{/each}{:else}{entry.title}{/if}</span
+            >
             <span class="spacer" />
             <span class="entry-date">{fmtDate(entry.date)}</span>
           </div>
@@ -1070,6 +1140,15 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .entry-title mark {
+    background: var(--highlight);
+    color: var(--highlight-fg);
+    border-radius: 2px;
+  }
+  .selected .entry-title mark {
+    background: var(--highlight-fg);
+    color: var(--highlight);
   }
   .entry-date,
   .feed-date {

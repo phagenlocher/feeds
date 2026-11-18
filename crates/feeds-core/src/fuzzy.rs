@@ -12,6 +12,17 @@
     reason = "lengths are far below 2^53, so the cast is lossless here"
 )]
 
+use serde::Serialize;
+
+/// A matched range in a title, in Unicode scalar-value offsets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct MatchSpan {
+    /// First matched character.
+    pub start: usize,
+    /// One past the last matched character.
+    pub end: usize,
+}
+
 /// Default match threshold.
 pub const PARTIAL_RATIO_THRESHOLD: f64 = 85.0;
 
@@ -25,11 +36,77 @@ pub fn ratio(a: &str, b: &str) -> f64 {
 /// Best [`ratio`] between the shorter string and any alignment of it in the
 /// longer string, including prefix and suffix alignments.
 pub fn partial_ratio(a: &str, b: &str) -> f64 {
-    let a_lower = a.to_lowercase();
-    let b_lower = b.to_lowercase();
-    let a_chars: Vec<char> = a_lower.chars().collect();
-    let b_chars: Vec<char> = b_lower.chars().collect();
+    let a_chars = lower_chars(a);
+    let b_chars = lower_chars(b);
     partial_ratio_chars(&a_chars, &b_chars)
+}
+
+/// The best-matching range in `title` for every whitespace-separated token in
+/// `query`, or an empty vector when any token does not match above the default
+/// threshold.
+pub fn find_matches(query: &str, title: &str) -> Vec<MatchSpan> {
+    if query.is_empty() || title.is_empty() {
+        return Vec::new();
+    }
+
+    let (haystack, origin) = lower_chars_with_origin(title);
+    if haystack.is_empty() {
+        return Vec::new();
+    }
+
+    let mut spans = Vec::new();
+    for token in query.split_whitespace() {
+        let needle = lower_chars(token);
+        if needle.is_empty() {
+            continue;
+        }
+        let Some(span) = match_span(&needle, &haystack, &origin) else {
+            return Vec::new();
+        };
+        spans.push(span);
+    }
+    merge_spans(spans)
+}
+
+fn match_span(needle: &[char], haystack: &[char], origin: &[usize]) -> Option<MatchSpan> {
+    let (score, span) = if haystack.len() >= needle.len() {
+        let (mut score, span) = best_alignment(needle, haystack);
+        // RapidFuzz also tries the opposite direction for equal-length strings,
+        // which lets a prefix or suffix of either string win.
+        if score < 100.0 && needle.len() == haystack.len() {
+            score = score.max(best_alignment(haystack, needle).0);
+        }
+        (score, span)
+    } else {
+        // The title is the needle, so no range inside it was recorded.
+        (best_alignment(haystack, needle).0, None)
+    };
+
+    if score < PARTIAL_RATIO_THRESHOLD {
+        return None;
+    }
+
+    let (start, end) = match span {
+        Some((start, end)) if end > start => (start, end),
+        _ => (0, haystack.len()),
+    };
+    Some(MatchSpan {
+        start: origin[start],
+        end: origin[end - 1] + 1,
+    })
+}
+
+/// Sort spans and merge the ones that overlap.
+fn merge_spans(mut spans: Vec<MatchSpan>) -> Vec<MatchSpan> {
+    spans.sort_by_key(|span| span.start);
+    let mut merged: Vec<MatchSpan> = Vec::with_capacity(spans.len());
+    for span in spans {
+        match merged.last_mut() {
+            Some(last) if span.start <= last.end => last.end = last.end.max(span.end),
+            _ => merged.push(span),
+        }
+    }
+    merged
 }
 
 /// Whether `title` matches `query` above the default threshold.
@@ -37,7 +114,26 @@ pub fn matches(query: &str, title: &str) -> bool {
     if query.is_empty() {
         return true;
     }
-    partial_ratio(query, title) >= PARTIAL_RATIO_THRESHOLD
+    !find_matches(query, title).is_empty()
+}
+
+/// Lowercase `text`, recording the index of the original character that
+/// produced each lowercased character. Lowercasing can expand a character
+/// (e.g. `İ` becomes `i` plus a combining dot), so the two lengths differ.
+fn lower_chars_with_origin(text: &str) -> (Vec<char>, Vec<usize>) {
+    let mut chars = Vec::new();
+    let mut origin = Vec::new();
+    for (index, ch) in text.chars().enumerate() {
+        for lower in ch.to_lowercase() {
+            chars.push(lower);
+            origin.push(index);
+        }
+    }
+    (chars, origin)
+}
+
+fn lower_chars(text: &str) -> Vec<char> {
+    text.chars().flat_map(char::to_lowercase).collect()
 }
 
 fn partial_ratio_chars(a: &[char], b: &[char]) -> f64 {
@@ -51,34 +147,47 @@ fn partial_ratio_chars(a: &[char], b: &[char]) -> f64 {
 
     let (short, long) = if a.len() <= b.len() { (a, b) } else { (b, a) };
 
-    let mut best = best_alignment(short, long);
-    // RapidFuzz also tries the opposite direction for equal-length strings,
-    // which lets a prefix or suffix of either string win.
+    let (mut best, _) = best_alignment(short, long);
     if best < 100.0 && short.len() == long.len() {
-        best = best.max(best_alignment(long, short));
+        best = best.max(best_alignment(long, short).0);
     }
     best
 }
 
-fn best_alignment(needle: &[char], long: &[char]) -> f64 {
+/// Best score between `needle` and an alignment in `long`, together with the
+/// character range in `long` that produced it.
+fn best_alignment(needle: &[char], long: &[char]) -> (f64, Option<(usize, usize)>) {
     let mut best: f64 = 0.0;
+    let mut span = None;
 
     if long.len() > needle.len() {
-        for window in long.windows(needle.len()) {
-            best = best.max(ratio_chars(needle, window));
+        for (start, window) in long.windows(needle.len()).enumerate() {
+            let score = ratio_chars(needle, window);
+            if score > best {
+                best = score;
+                span = Some((start, start + needle.len()));
+            }
             if best >= 100.0 {
-                return 100.0;
+                return (100.0, span);
             }
         }
     }
 
     for end in 1..needle.len() {
-        best = best.max(ratio_chars(needle, &long[..end]));
+        let score = ratio_chars(needle, &long[..end]);
+        if score > best {
+            best = score;
+            span = Some((0, end));
+        }
     }
     for start in (long.len() - needle.len())..long.len() {
-        best = best.max(ratio_chars(needle, &long[start..]));
+        let score = ratio_chars(needle, &long[start..]);
+        if score > best {
+            best = score;
+            span = Some((start, long.len()));
+        }
     }
-    best
+    (best, span)
 }
 
 fn ratio_chars(a: &[char], b: &[char]) -> f64 {
@@ -182,5 +291,87 @@ mod tests {
     #[test]
     fn empty_query_matches_everything() {
         assert!(matches("", "anything"));
+    }
+
+    fn matched_texts(query: &str, title: &str) -> Option<Vec<String>> {
+        let spans = find_matches(query, title);
+        if spans.is_empty() {
+            return None;
+        }
+        Some(
+            spans
+                .iter()
+                .map(|span| {
+                    title
+                        .chars()
+                        .skip(span.start)
+                        .take(span.end - span.start)
+                        .collect()
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn find_matches_returns_the_best_aligned_spans() {
+        assert_eq!(
+            matched_texts("latex", "Is LaTeX worth it?"),
+            Some(vec!["LaTeX".to_string()])
+        );
+        assert_eq!(
+            matched_texts("latex", "Software Projects Will Be Late"),
+            Some(vec!["Late".to_string()])
+        );
+        assert_eq!(
+            matched_texts("rust", "In Blob We Trust"),
+            Some(vec!["rust".to_string()])
+        );
+    }
+
+    #[test]
+    fn find_matches_requires_every_query_token() {
+        assert_eq!(
+            matched_texts("defeat return", "Defeating Return Type Polymorphism"),
+            Some(vec!["Defeat".to_string(), "Return".to_string()])
+        );
+        assert_eq!(
+            find_matches("defeat missing", "Defeating Return Type Polymorphism"),
+            Vec::new()
+        );
+    }
+
+    #[test]
+    fn find_matches_is_order_independent() {
+        assert_eq!(
+            matched_texts("return defeat", "Defeating Return Type Polymorphism"),
+            Some(vec!["Defeat".to_string(), "Return".to_string()])
+        );
+    }
+
+    #[test]
+    fn find_matches_merges_duplicate_tokens() {
+        assert_eq!(find_matches("rust rust", "Rust and Boll").len(), 1);
+    }
+
+    #[test]
+    fn find_matches_returns_none_for_non_matches() {
+        assert_eq!(find_matches("latex", "Paintings"), Vec::new());
+        assert_eq!(find_matches("", "anything"), Vec::new());
+    }
+
+    #[test]
+    fn find_matches_highlights_a_short_title_whole() {
+        let spans = find_matches("xxgadtsyy", "gadts");
+        assert_eq!(spans.len(), 1);
+        assert_eq!((spans[0].start, spans[0].end), (0, 5));
+    }
+
+    #[test]
+    fn find_matches_maps_expanded_lowercase_chars() {
+        // 'İ' lowercases to `i` plus a combining dot; the span must still
+        // cover the single original character.
+        let spans = find_matches("i", "İ");
+        assert_eq!(spans.len(), 1);
+        assert_eq!((spans[0].start, spans[0].end), (0, 1));
     }
 }

@@ -46,4 +46,9 @@ export interface Settings {
   tag_colors: Record<string, string>;
 }
 
+export interface MatchSpan {
+  start: number;
+  end: number;
+}
+
 export const UNTAGGED = "__untagged__";

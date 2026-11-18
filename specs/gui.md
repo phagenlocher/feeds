@@ -141,8 +141,7 @@ Tag color, Manage tags or About
 **Scenario: the user searches for text**
 **Given** the search bar is visible
 **When** the user types a query
-**Then** after a 150 ms debounce all entry titles are sent to `fuzzy_filter`
-in one call
+**Then** all entry titles are sent to `fuzzy_filter` in one call on every input
 **And** non-matching rows are hidden
 **And** feeds with no visible entries are hidden
 
@@ -152,6 +151,19 @@ in one call
 **Then** a title containing “LaTeX” is shown
 **And** titles without a near-substring match, such as “Paintings”, are hidden
 even though they share letters with the query
+
+**Scenario: a multi-word query matches titles word by word**
+**Given** the search bar is visible
+**When** the user searches for `defeat return`
+**Then** “Defeating Return Type Polymorphism” is shown
+**And** “Defeat” and “Return” are highlighted
+
+**Scenario: matching entries are expanded and highlighted**
+**Given** the search bar is visible and a query has been entered
+**When** matching entries are shown
+**Then** every feed with matching entries is expanded
+**And** the matched part of each entry title is highlighted
+**And** clearing the query restores the expansion state from before the search
 
 **Scenario: the search results stay in sync with the query**
 **Given** the search query changes
@@ -284,7 +296,7 @@ Defined in `crates/feeds-app/src/commands.rs` and invoked from the frontend with
 | `set_tag_color(tag, color)` | Persist the color of a single tag |
 | `export_opml` / `import_opml(xml)` | OPML import/export |
 | `read_file(path)` / `write_file(path, contents)` | File helpers for OPML dialogs |
-| `fuzzy_filter(query, texts)` | Rust-side Indel/LCS partial-ratio matching |
+| `fuzzy_filter(query, texts)` | Rust-side Indel/LCS partial-ratio matching; returns highlight spans per matching title |
 
 Async commands (`discover_feeds`, `update_feed`, `update_feeds`) run on Tauri's
 async runtime.
@@ -301,8 +313,19 @@ async runtime.
   same-length window of the longer one, plus all prefix and suffix alignments.
   For equal-length strings it also considers prefixes and suffixes of the first
   string, matching RapidFuzz's implementation.
-- A title matches when its `partial_ratio` with the query is at least 85
+- A token matches when its `partial_ratio` with the title is at least 85
   (stricter than the former app's 80).
+- The query is split on whitespace and every token must match the title
+  independently, so `defeat return` matches “Defeating Return Type
+  Polymorphism”. Each token's best alignment is highlighted.
+- `fuzzy_filter` returns, for each title, the character spans of the token
+  alignments in the original title (an empty list when it does not match). The
+  frontend splits the title on those spans and renders the matches inside
+  `<mark>`; offsets count Unicode scalar values, so the UI splits titles with
+  `Array.from`.
+- While `filterText` is non-empty, `visibleNodes` renders feeds with matching
+  entries as expanded. `expanded` itself is not modified, so clearing the query
+  restores the previous tree state.
 
 ### Frontend state
 
@@ -315,6 +338,7 @@ state:
 | `expanded` | Set of expanded feed URLs |
 | `selected` | Currently selected feed/entry |
 | `filterText` / `hidden` | Search query and its fuzzy result set |
+| `matchSpans` | Highlight span for each matching entry title |
 | `tagFilter` | `""`, `"__untagged__"`, or a tag name |
 | `tagKeys` | All tag names, used by the tag filter and dialogs |
 | `showSearch` / `showTagFilter` | Visibility of the search bar and the tag filter |

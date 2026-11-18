@@ -209,14 +209,12 @@ pub fn write_file(path: String, contents: String) -> Result<(), String> {
     std::fs::write(&path, contents).map_err(err)
 }
 
-/// Fuzzy-match a query against a list of texts.
+/// Fuzzy-match a query against a list of texts, returning the highlight spans
+/// for each matching text.
 #[tauri::command]
-pub fn fuzzy_filter(query: String, texts: Vec<String>) -> Vec<bool> {
-    if query.is_empty() {
-        return vec![true; texts.len()];
-    }
+pub fn fuzzy_filter(query: String, texts: Vec<String>) -> Vec<Vec<feeds_core::fuzzy::MatchSpan>> {
     texts
         .into_iter()
-        .map(|text| feeds_core::fuzzy::matches(&query, &text))
+        .map(|text| feeds_core::fuzzy::find_matches(&query, &text))
         .collect()
 }

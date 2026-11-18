@@ -45,6 +45,9 @@ The frontend recipes (`just ui-install` / `just ui-build`) always use
   newest entry, never the feed's last-updated timestamp.
 - Fuzzy title matching uses normalized Indel (LCS) partial-ratio matching
   (threshold 85), based on the former Python app's RapidFuzz behaviour.
+- Search forces feeds with matches to render expanded (without mutating
+  `expanded`) and highlights the spans returned by `fuzzy_filter`. Every
+  whitespace-separated query token must match the title.
 - Frontend: Svelte 4 + TypeScript; theme colors derive from the system palette
   via CSS variables (`Canvas`, `CanvasText`, `Highlight`, `HighlightText`) and
   `color-mix`. The modal backdrop and menu shadow use translucent black.
