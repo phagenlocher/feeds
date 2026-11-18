@@ -161,7 +161,7 @@
 
   function onFilterInput() {
     clearTimeout(filterTimer);
-    filterTimer = setTimeout(() => applyFilter(), 300);
+    filterTimer = setTimeout(() => applyFilter(), 150);
   }
 
   function toggleFeed(url: string) {

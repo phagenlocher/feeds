@@ -43,7 +43,8 @@ The frontend recipes (`just ui-install` / `just ui-build`) always use
   only the fallback when a feed publishes none); they are rendered as
   `YYYY-MM-DD` in the user's local time zone. A feed row shows the date of its
   newest entry, never the feed's last-updated timestamp.
-- Fuzzy title matching uses partial-ratio matching (threshold 80).
+- Fuzzy title matching uses normalized Indel (LCS) partial-ratio matching
+  (threshold 85), based on the former Python app's RapidFuzz behaviour.
 - Frontend: Svelte 4 + TypeScript; theme colors derive from the system palette
   via CSS variables (`Canvas`, `CanvasText`, `Highlight`, `HighlightText`) and
   `color-mix`. The modal backdrop and menu shadow use translucent black.

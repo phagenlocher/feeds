@@ -141,10 +141,17 @@ Tag color, Manage tags or About
 **Scenario: the user searches for text**
 **Given** the search bar is visible
 **When** the user types a query
-**Then** after a 300 ms debounce all entry titles are sent to `fuzzy_filter`
+**Then** after a 150 ms debounce all entry titles are sent to `fuzzy_filter`
 in one call
 **And** non-matching rows are hidden
 **And** feeds with no visible entries are hidden
+
+**Scenario: the search is substring-oriented**
+**Given** the search bar is visible
+**When** the user searches for `latex`
+**Then** a title containing “LaTeX” is shown
+**And** titles without a near-substring match, such as “Paintings”, are hidden
+even though they share letters with the query
 
 **Scenario: the search results stay in sync with the query**
 **Given** the search query changes
@@ -277,10 +284,25 @@ Defined in `crates/feeds-app/src/commands.rs` and invoked from the frontend with
 | `set_tag_color(tag, color)` | Persist the color of a single tag |
 | `export_opml` / `import_opml(xml)` | OPML import/export |
 | `read_file(path)` / `write_file(path, contents)` | File helpers for OPML dialogs |
-| `fuzzy_filter(query, texts)` | Rust-side fuzzy matching |
+| `fuzzy_filter(query, texts)` | Rust-side Indel/LCS partial-ratio matching |
 
 Async commands (`discover_feeds`, `update_feed`, `update_feeds`) run on Tauri's
 async runtime.
+
+### Fuzzy matching
+
+`crates/feeds-core/src/fuzzy.rs` implements the search with RapidFuzz's
+`fuzz.partial_ratio` semantics, as the former Python app did:
+
+- Both strings are lowercased.
+- `ratio` is the normalized Indel similarity, derived from the longest common
+  subsequence: `(1 - (len1 + len2 - 2·LCS) / (len1 + len2)) · 100`.
+- `partial_ratio` returns the best `ratio` between the shorter string and any
+  same-length window of the longer one, plus all prefix and suffix alignments.
+  For equal-length strings it also considers prefixes and suffixes of the first
+  string, matching RapidFuzz's implementation.
+- A title matches when its `partial_ratio` with the query is at least 85
+  (stricter than the former app's 80).
 
 ### Frontend state
 
